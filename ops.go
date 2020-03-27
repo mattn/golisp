@@ -1,4 +1,4 @@
-package main
+package golisp
 
 import (
 	"errors"
@@ -18,7 +18,7 @@ func init() {
 	ops["setq"] = doSetq
 	ops["+"] = doPlus
 	ops["-"] = doMinus
-	ops["+"] = doMul
+	ops["*"] = doMul
 	ops["/"] = doDiv
 	ops["<"] = doLess
 	ops["="] = doEqual
@@ -116,6 +116,7 @@ func doSetq(env *Env, node *Node) (*Node, error) {
 }
 
 func doPlus(env *Env, node *Node) (*Node, error) {
+	println("plus")
 	var ret *Node
 
 	ret = &Node{
@@ -123,6 +124,7 @@ func doPlus(env *Env, node *Node) (*Node, error) {
 		v: int64(0),
 	}
 	curr := node
+	fmt.Println("plus", curr)
 	for curr != nil {
 		v, err := eval(env, curr.car)
 		if err != nil {

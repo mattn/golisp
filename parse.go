@@ -1,4 +1,4 @@
-package main
+package golisp
 
 import (
 	"bufio"
@@ -38,19 +38,25 @@ type Node struct {
 	cdr *Node
 }
 
-type parser struct {
+func NewParser(r io.Reader) *Parser {
+	return &Parser{
+		buf: bufio.NewReader(r),
+	}
+}
+
+type Parser struct {
 	buf *bufio.Reader
 	pos int
 }
 
-func (p *parser) NewError(err error) *Node {
+func (p *Parser) NewError(err error) *Node {
 	return &Node{
 		t: NodeError,
 		v: err,
 	}
 }
 
-func (p *parser) SkipWhite() {
+func (p *Parser) SkipWhite() {
 	for {
 		r, err := p.readRune()
 		if err != nil {
@@ -75,7 +81,7 @@ func (p *parser) SkipWhite() {
 	}
 }
 
-func (p *parser) ParseParen() (*Node, error) {
+func (p *Parser) ParseParen() (*Node, error) {
 	head := &Node{
 		t: NodeCell,
 	}
@@ -110,7 +116,7 @@ func (p *parser) ParseParen() (*Node, error) {
 	return head, nil
 }
 
-func (p *parser) ParseString() (*Node, error) {
+func (p *Parser) ParseString() (*Node, error) {
 	var buf bytes.Buffer
 	for {
 		r, err := p.readRune()
@@ -133,17 +139,17 @@ func isSymbolLetter(r rune) bool {
 	return strings.ContainsRune(`+-*/<>=&%?.@_#$:*`, r)
 }
 
-func (p *parser) Pos() int {
+func (p *Parser) Pos() int {
 	return p.pos
 }
 
-func (p *parser) readRune() (rune, error) {
+func (p *Parser) readRune() (rune, error) {
 	r, n, err := p.buf.ReadRune()
 	p.pos += n
 	return r, err
 }
 
-func (p *parser) ParsePrimitive() (*Node, error) {
+func (p *Parser) ParsePrimitive() (*Node, error) {
 	var buf bytes.Buffer
 	for {
 		r, err := p.readRune()
@@ -193,7 +199,7 @@ func (p *parser) ParsePrimitive() (*Node, error) {
 	}, nil
 }
 
-func (p *parser) ParseAny() (*Node, error) {
+func (p *Parser) ParseAny() (*Node, error) {
 	p.SkipWhite()
 	r, err := p.readRune()
 	if err != nil {
@@ -290,6 +296,9 @@ func eval(env *Env, node *Node) (*Node, error) {
 		}
 		return nil, fmt.Errorf("undefined symbol: %v", node.v)
 	case NodeCell:
+		if node.car.t == NodeCell && node.cdr == nil {
+			node = node.car
+		}
 		lhs, err := eval(env, node.car)
 		if err != nil {
 			return nil, err
@@ -300,6 +309,7 @@ func eval(env *Env, node *Node) (*Node, error) {
 			if !ok {
 				return nil, fmt.Errorf("invalid op: %v", name)
 			}
+
 			ret, err = fn(env, node.cdr)
 			if err != nil {
 				return nil, err
@@ -320,4 +330,8 @@ func NewEnv() *Env {
 		vars: make(map[string]*Node),
 		env:  nil,
 	}
+}
+
+func (e *Env) Eval(node *Node) (*Node, error) {
+	return eval(e, node)
 }
