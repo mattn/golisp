@@ -154,6 +154,9 @@ func (p *Parser) ParsePrimitive() (*Node, error) {
 	for {
 		r, err := p.readRune()
 		if err != nil {
+			if err == io.EOF {
+				break
+			}
 			return nil, err
 		}
 
@@ -296,7 +299,7 @@ func eval(env *Env, node *Node) (*Node, error) {
 		}
 		return nil, fmt.Errorf("undefined symbol: %v", node.v)
 	case NodeCell:
-		if node.car.t == NodeCell && node.cdr == nil {
+		if node.car != nil && node.car.t == NodeCell && node.cdr == nil {
 			node = node.car
 		}
 		lhs, err := eval(env, node.car)
