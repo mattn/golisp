@@ -28,6 +28,8 @@ func init() {
 	ops["or"] = doOr
 	ops["cond"] = doCond
 	ops["cons"] = doCons
+	ops["car"] = doCar
+	ops["cdr"] = doCdr
 }
 
 func doPrin1(env *Env, node *Node) (*Node, error) {
@@ -548,4 +550,18 @@ func doCons(env *Env, node *Node) (*Node, error) {
 		car: lhs,
 		cdr: rhs,
 	}, nil
+}
+
+func doCar(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
+	return node.car.cdr.car, nil
+}
+
+func doCdr(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
+	return node.car.cdr.cdr, nil
 }
