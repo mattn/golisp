@@ -14,6 +14,12 @@ $ golisp < foo.lisp
 $ go get github.com/mattn/golisp
 ```
 
+## TODO
+
+* defun
+* macro
+* cons-cell
+
 ## License
 
 MIT
