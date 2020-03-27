@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type Fn func(*Env, *Node) (*Node, error)
 
@@ -47,6 +50,13 @@ func doPrint(env *Env, node *Node) (*Node, error) {
 func doDotimes(env *Env, node *Node) (*Node, error) {
 	var ret *Node
 	var err error
+
+	if node.car == nil || node.car.car == nil {
+		return nil, errors.New("invalid arguments")
+	}
+	if node.car == nil || node.car.cdr == nil || node.car.cdr.car == nil {
+		return nil, errors.New("invalid arguments")
+	}
 	v := node.car.car.v.(string)
 	c := node.car.cdr.car.v.(int64)
 
@@ -251,6 +261,9 @@ func doEqual(env *Env, node *Node) (*Node, error) {
 		return nil, err
 	}
 
+	if node.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
 		return nil, err
@@ -289,6 +302,9 @@ func doLess(env *Env, node *Node) (*Node, error) {
 		return nil, err
 	}
 
+	if node.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
 		return nil, err
@@ -327,6 +343,9 @@ func doIf(env *Env, node *Node) (*Node, error) {
 		return nil, err
 	}
 
+	if node.car.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
 	var b bool
 	switch v.t {
 	case NodeInt:
@@ -342,7 +361,7 @@ func doIf(env *Env, node *Node) (*Node, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	} else if node.car.cdr.car != nil {
 		v, err = eval(env, node.car.cdr.car.car)
 		if err != nil {
 			return nil, err
@@ -357,6 +376,9 @@ func doMod(env *Env, node *Node) (*Node, error) {
 		return nil, err
 	}
 
+	if node.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
 		return nil, err
@@ -388,6 +410,9 @@ func doAnd(env *Env, node *Node) (*Node, error) {
 		return nil, err
 	}
 
+	if node.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
 		return nil, err
@@ -430,6 +455,9 @@ func doOr(env *Env, node *Node) (*Node, error) {
 		return nil, err
 	}
 
+	if node.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
 		return nil, err
@@ -472,6 +500,9 @@ func doCond(env *Env, node *Node) (*Node, error) {
 
 	curr := node
 	for curr != nil {
+		if curr.car == nil || curr.car.cdr == nil {
+			return nil, errors.New("invalid arguments")
+		}
 		ret, err = eval(env, curr.car.car)
 		if err != nil {
 			return nil, err
