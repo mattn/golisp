@@ -11,7 +11,7 @@ $ golisp < foo.lisp
 ## Installation
 
 ```shell
-$ go get github.com/mattn/golisp
+$ go get github.com/mattn/golisp/cmd/golisp
 ```
 
 ## TODO
