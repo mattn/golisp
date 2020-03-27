@@ -209,9 +209,7 @@ func (p *Parser) ParseAny() (*Node, error) {
 	p.SkipWhite()
 	r, err := p.readRune()
 	if err != nil {
-		if err != io.EOF {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	if r == ')' {
@@ -237,7 +235,7 @@ func (p *Parser) ParseAny() (*Node, error) {
 	if r == '"' {
 		return p.ParseString()
 	}
-	return nil, fmt.Errorf("invalid token: %c (%d)", r, p.Pos())
+	return nil, fmt.Errorf("invalid token: '%c' (%d)", r, p.Pos())
 }
 
 func (n *Node) String() string {

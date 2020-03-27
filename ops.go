@@ -27,6 +27,7 @@ func init() {
 	ops["and"] = doAnd
 	ops["or"] = doOr
 	ops["cond"] = doCond
+	ops["cons"] = doCons
 }
 
 func doPrin1(env *Env, node *Node) (*Node, error) {
@@ -116,7 +117,6 @@ func doSetq(env *Env, node *Node) (*Node, error) {
 }
 
 func doPlus(env *Env, node *Node) (*Node, error) {
-	println("plus")
 	var ret *Node
 
 	ret = &Node{
@@ -124,7 +124,6 @@ func doPlus(env *Env, node *Node) (*Node, error) {
 		v: int64(0),
 	}
 	curr := node
-	fmt.Println("plus", curr)
 	for curr != nil {
 		v, err := eval(env, curr.car)
 		if err != nil {
@@ -528,4 +527,25 @@ func doCond(env *Env, node *Node) (*Node, error) {
 		curr = curr.cdr
 	}
 	return ret, nil
+}
+
+func doCons(env *Env, node *Node) (*Node, error) {
+	lhs, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+
+	if node.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
+	rhs, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Node{
+		t:   NodeCell,
+		car: lhs,
+		cdr: rhs,
+	}, nil
 }
