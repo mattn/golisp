@@ -121,6 +121,9 @@ func (p *Parser) ParseString() (*Node, error) {
 	for {
 		r, err := p.readRune()
 		if err != nil {
+			if err == io.EOF {
+				break
+			}
 			return nil, err
 		}
 
@@ -206,7 +209,9 @@ func (p *Parser) ParseAny() (*Node, error) {
 	p.SkipWhite()
 	r, err := p.readRune()
 	if err != nil {
-		return nil, err
+		if err != io.EOF {
+			return nil, err
+		}
 	}
 
 	if r == ')' {
