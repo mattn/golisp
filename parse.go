@@ -166,7 +166,7 @@ func (p *parser) ParsePrimitive() (*Node, error) {
 			v: nil,
 		}, nil
 	}
-	if s == "f" {
+	if s == "t" {
 		return &Node{
 			t: NodeT,
 			v: true,
@@ -307,6 +307,8 @@ func eval(env *Env, node *Node) (*Node, error) {
 		} else {
 			ret = lhs
 		}
+	case NodeQuote:
+		ret = node.car
 	default:
 		ret = node
 	}

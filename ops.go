@@ -17,8 +17,13 @@ func init() {
 	ops["-"] = doMinus
 	ops["+"] = doMul
 	ops["/"] = doDiv
-	//ops["if"] = doIf
-	//ops["="] = doEqual
+	ops["<"] = doLess
+	ops["="] = doEqual
+	ops["if"] = doIf
+	ops["mod"] = doMod
+	ops["and"] = doAnd
+	ops["or"] = doOr
+	ops["cond"] = doCond
 }
 
 func doPrin1(env *Env, node *Node) (*Node, error) {
@@ -234,6 +239,258 @@ func doDiv(env *Env, node *Node) (*Node, error) {
 			case NodeDouble:
 				ret.v = ret.v.(float64) / v.v.(float64)
 			}
+		}
+		curr = curr.cdr
+	}
+	return ret, nil
+}
+
+func doEqual(env *Env, node *Node) (*Node, error) {
+	lhs, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+
+	rhs, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+
+	var f1, f2 float64
+	switch lhs.t {
+	case NodeInt:
+		f1 = float64(lhs.v.(int64))
+	case NodeDouble:
+		f1 = lhs.v.(float64)
+	}
+	switch rhs.t {
+	case NodeInt:
+		f2 = float64(rhs.v.(int64))
+	case NodeDouble:
+		f2 = rhs.v.(float64)
+	}
+
+	if f1 == f2 {
+		return &Node{
+			t: NodeT,
+			v: true,
+		}, nil
+	}
+
+	return &Node{
+		t: NodeNil,
+		v: nil,
+	}, nil
+}
+
+func doLess(env *Env, node *Node) (*Node, error) {
+	lhs, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+
+	rhs, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+
+	var f1, f2 float64
+	switch lhs.t {
+	case NodeInt:
+		f1 = float64(lhs.v.(int64))
+	case NodeDouble:
+		f1 = lhs.v.(float64)
+	}
+	switch rhs.t {
+	case NodeInt:
+		f2 = float64(rhs.v.(int64))
+	case NodeDouble:
+		f2 = rhs.v.(float64)
+	}
+
+	if f1 < f2 {
+		return &Node{
+			t: NodeT,
+			v: true,
+		}, nil
+	}
+
+	return &Node{
+		t: NodeNil,
+		v: nil,
+	}, nil
+}
+
+func doIf(env *Env, node *Node) (*Node, error) {
+	v, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+
+	var b bool
+	switch v.t {
+	case NodeInt:
+		b = v.v.(int64) != 0
+	case NodeDouble:
+		b = v.v.(float64) != 0
+	case NodeT:
+		b = true
+	}
+
+	if b {
+		v, err = eval(env, node.car.cdr.car)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		v, err = eval(env, node.car.cdr.car.car)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return v, nil
+}
+
+func doMod(env *Env, node *Node) (*Node, error) {
+	lhs, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+
+	rhs, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+
+	var i1, i2 int64
+	switch lhs.t {
+	case NodeInt:
+		i1 = lhs.v.(int64)
+	case NodeDouble:
+		i1 = int64(lhs.v.(float64))
+	}
+	switch rhs.t {
+	case NodeInt:
+		i2 = rhs.v.(int64)
+	case NodeDouble:
+		i2 = int64(rhs.v.(float64))
+	}
+
+	return &Node{
+		t: NodeInt,
+		v: i1 % i2,
+	}, nil
+}
+
+func doAnd(env *Env, node *Node) (*Node, error) {
+	lhs, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+
+	rhs, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+
+	var b1, b2 bool
+	switch lhs.t {
+	case NodeInt:
+		b1 = lhs.v.(int64) != 0
+	case NodeDouble:
+		b1 = lhs.v.(float64) != 0
+	case NodeT:
+		b1 = true
+	}
+	switch rhs.t {
+	case NodeInt:
+		b2 = rhs.v.(int64) != 0
+	case NodeDouble:
+		b2 = rhs.v.(float64) != 0
+	case NodeT:
+		b1 = true
+	}
+
+	if b1 && b2 {
+		return &Node{
+			t: NodeNil,
+			v: nil,
+		}, nil
+	}
+
+	return &Node{
+		t: NodeNil,
+		v: nil,
+	}, nil
+}
+
+func doOr(env *Env, node *Node) (*Node, error) {
+	lhs, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+
+	rhs, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+
+	var b1, b2 bool
+	switch lhs.t {
+	case NodeInt:
+		b1 = lhs.v.(int64) != 0
+	case NodeDouble:
+		b1 = lhs.v.(float64) != 0
+	case NodeT:
+		b1 = true
+	}
+	switch rhs.t {
+	case NodeInt:
+		b2 = rhs.v.(int64) != 0
+	case NodeDouble:
+		b2 = rhs.v.(float64) != 0
+	case NodeT:
+		b1 = true
+	}
+
+	if b1 || b2 {
+		return &Node{
+			t: NodeNil,
+			v: nil,
+		}, nil
+	}
+
+	return &Node{
+		t: NodeNil,
+		v: nil,
+	}, nil
+}
+
+func doCond(env *Env, node *Node) (*Node, error) {
+	var ret *Node
+	var err error
+
+	curr := node
+	for curr != nil {
+		ret, err = eval(env, curr.car.car)
+		if err != nil {
+			return nil, err
+		}
+		var b bool
+		switch ret.t {
+		case NodeInt:
+			b = ret.v.(int64) != 0
+		case NodeDouble:
+			b = ret.v.(float64) != 0
+		case NodeT:
+			b = true
+		}
+		if b {
+			ret, err = eval(env, curr.car.cdr.car)
+			if err != nil {
+				return nil, err
+			}
+			break
 		}
 		curr = curr.cdr
 	}
