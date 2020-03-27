@@ -17,6 +17,9 @@ $ go get github.com/mattn/golisp
 ## TODO
 
 * defun
+* lambda
+* user-function
+* aref
 * macro
 * cons-cell
 
