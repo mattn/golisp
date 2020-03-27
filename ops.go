@@ -192,7 +192,7 @@ func doMul(env *Env, node *Node) (*Node, error) {
 
 	ret = &Node{
 		t: NodeInt,
-		v: int64(0),
+		v: int64(1),
 	}
 	curr := node
 	for curr != nil {
@@ -227,7 +227,7 @@ func doDiv(env *Env, node *Node) (*Node, error) {
 
 	ret = &Node{
 		t: NodeInt,
-		v: int64(0),
+		v: int64(1),
 	}
 	curr := node
 	for curr != nil {
