@@ -26,6 +26,7 @@ func init() {
 	ops["<"] = doLess
 	ops["="] = doEqual
 	ops["if"] = doIf
+	ops["not"] = doNot
 	ops["mod"] = doMod
 	ops["%"] = doMod
 	ops["and"] = doAnd
@@ -113,10 +114,10 @@ func eval(env *Env, node *Node) (*Node, error) {
 		} else if lhs != nil && lhs.t == NodeEnv {
 			scope := NewEnv()
 			var code *Node
-			if lhs.cdr.cdr != nil {
+			if lhs.cdr.car != nil {
 				arg := lhs.cdr.car
 				val := node.cdr
-				for arg != nil {
+				for arg != nil && arg.car != nil {
 					scope.vars[arg.car.v.(string)] = val.car
 					arg = arg.cdr
 					val = val.cdr
@@ -154,7 +155,7 @@ func doPrint(env *Env, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(ret)
+	fmt.Println(ret.v)
 	return ret, nil
 }
 
@@ -203,10 +204,11 @@ func doLet(env *Env, node *Node) (*Node, error) {
 		return nil, err
 	}
 	scope := NewEnv()
+	scope.env = env
 	scope.vars[v] = vv
-	curr := node.cdr.cdr
+	curr := node.cdr
 	for curr != nil {
-		ret, err = eval(scope, curr)
+		ret, err = eval(scope, curr.car)
 		if err != nil {
 			return nil, err
 		}
@@ -217,12 +219,11 @@ func doLet(env *Env, node *Node) (*Node, error) {
 
 func doSetq(env *Env, node *Node) (*Node, error) {
 	v := node.car.v.(string)
-	vv, err := eval(env, node.cdr)
+	vv, err := eval(env, node.cdr.car)
 	if err != nil {
 		return nil, err
 	}
-	scope := NewEnv()
-	scope.vars[v] = vv
+	env.vars[v] = vv
 	return vv, nil
 }
 
@@ -534,8 +535,41 @@ func doIf(env *Env, node *Node) (*Node, error) {
 		if err != nil {
 			return nil, err
 		}
+	} else if node.cdr.cdr != nil {
+		v, err = eval(env, node.cdr.cdr.car)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return v, nil
+}
+
+func doNot(env *Env, node *Node) (*Node, error) {
+	v, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+
+	if node.car.cdr == nil {
+		return nil, errors.New("invalid arguments")
+	}
+	var b bool
+	switch v.t {
+	case NodeInt:
+		b = v.v.(int64) != 0
+	case NodeDouble:
+		b = v.v.(float64) != 0
+	case NodeT:
+		b = true
+	}
+
+	if !b {
+		v, err = eval(env, node.car.cdr.car)
+		if err != nil {
+			return nil, err
+		}
 	} else if node.car.cdr.car != nil {
-		v, err = eval(env, node.car.cdr.car.car)
+		v, err = eval(env, node.cdr.cdr)
 		if err != nil {
 			return nil, err
 		}
