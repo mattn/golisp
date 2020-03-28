@@ -26,14 +26,16 @@ func TestOps(t *testing.T) {
 		parser := NewParser(strings.NewReader(input))
 		node, err := parser.ParseParen()
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			continue
 		}
 		var buf bytes.Buffer
 		env := NewEnv()
 		env.out = &buf
 		_, err = env.Eval(node)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			continue
 		}
 		got := buf.String()
 		b, err = ioutil.ReadFile(fn[:len(fn)-4] + "out")
