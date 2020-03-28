@@ -1,5 +1,7 @@
 # golisp
 
+![CI](https://github.com/mattn/golisp/workflows/CI/badge.svg)
+
 Lisp Interpreter
 
 ## Usage
