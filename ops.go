@@ -17,6 +17,8 @@ func init() {
 	ops["print"] = doPrint
 	ops["let"] = doLet
 	ops["setq"] = doSetq
+	ops["1+"] = doPlusOne
+	ops["1-"] = doMinusOne
 	ops["+"] = doPlus
 	ops["-"] = doMinus
 	ops["*"] = doMul
@@ -25,6 +27,7 @@ func init() {
 	ops["="] = doEqual
 	ops["if"] = doIf
 	ops["mod"] = doMod
+	ops["%"] = doMod
 	ops["and"] = doAnd
 	ops["or"] = doOr
 	ops["cond"] = doCond
@@ -190,6 +193,37 @@ func doSetq(env *Env, node *Node) (*Node, error) {
 	return vv, nil
 }
 
+func doPlusOne(env *Env, node *Node) (*Node, error) {
+	var ret *Node
+
+	ret = &Node{
+		t: NodeInt,
+		v: int64(0),
+	}
+	v, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+	switch ret.t {
+	case NodeInt:
+		switch v.t {
+		case NodeInt:
+			ret.v = v.v.(int64) + 1
+		case NodeDouble:
+			ret.v = v.v.(float64) + 1
+			ret.t = NodeDouble
+		}
+	case NodeDouble:
+		switch v.t {
+		case NodeInt:
+			ret.v = float64(v.v.(int64)) + 1
+		case NodeDouble:
+			ret.v = v.v.(float64) + 1
+		}
+	}
+	return ret, nil
+}
+
 func doPlus(env *Env, node *Node) (*Node, error) {
 	var ret *Node
 
@@ -221,6 +255,37 @@ func doPlus(env *Env, node *Node) (*Node, error) {
 			}
 		}
 		curr = curr.cdr
+	}
+	return ret, nil
+}
+
+func doMinusOne(env *Env, node *Node) (*Node, error) {
+	var ret *Node
+
+	ret = &Node{
+		t: NodeInt,
+		v: int64(0),
+	}
+	v, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+	switch ret.t {
+	case NodeInt:
+		switch v.t {
+		case NodeInt:
+			ret.v = v.v.(int64) - 1
+		case NodeDouble:
+			ret.v = v.v.(float64) - 1
+			ret.t = NodeDouble
+		}
+	case NodeDouble:
+		switch v.t {
+		case NodeInt:
+			ret.v = float64(v.v.(int64)) - 1
+		case NodeDouble:
+			ret.v = v.v.(float64) - 1
+		}
 	}
 	return ret, nil
 }
