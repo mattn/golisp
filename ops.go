@@ -193,7 +193,7 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 		vv.v = i
 		curr := node
 		for curr != nil {
-			ret, err = eval(scope, curr)
+			ret, err = eval(scope, curr.car)
 			if err != nil {
 				return nil, err
 			}

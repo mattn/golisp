@@ -42,7 +42,7 @@ func TestOps(t *testing.T) {
 		}
 		want := string(b)
 		if diff := cmp.Diff(want, got); diff != "" {
-			t.Fatalf(diff)
+			t.Errorf(diff)
 		}
 	}
 }
