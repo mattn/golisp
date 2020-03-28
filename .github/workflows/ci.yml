@@ -17,6 +17,6 @@ jobs:
     - name: Add $GOPATH/bin to $PATH
       run: echo "::add-path::$(go env GOPATH)/bin"
     - name: Test
-      run: make test
+      run: go test -v
     #- name: Lint
     #  run: make lint
