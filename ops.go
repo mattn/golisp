@@ -1,6 +1,7 @@
 package golisp
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 )
@@ -31,6 +32,7 @@ func init() {
 	ops["car"] = doCar
 	ops["cdr"] = doCdr
 	ops["apply"] = doApply
+	ops["concatenate"] = doConcatenate
 }
 
 func eval(env *Env, node *Node) (*Node, error) {
@@ -616,10 +618,44 @@ func doCdr(env *Env, node *Node) (*Node, error) {
 }
 
 func doApply(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.cdr == nil || node.cdr.car == nil {
+		return nil, errors.New("invalid arguments")
+	}
 	v := &Node{
 		t:   NodeCell,
 		car: node.car.car,
 		cdr: node.cdr.car.car,
 	}
 	return eval(env, v)
+}
+
+func doAref(env *Env, node *Node) (*Node, error) {
+	v := &Node{
+		t:   NodeAref,
+		car: node.car,
+	}
+	return v, nil
+}
+
+func doConcatenate(env *Env, node *Node) (*Node, error) {
+	var buf bytes.Buffer
+	curr := node
+	for curr != nil {
+		v, err := eval(env, curr.car)
+		if err != nil {
+			return nil, err
+		}
+		switch v.t {
+		case NodeString:
+			buf.WriteString(v.v.(string))
+		default:
+			return nil, errors.New("invalid arguments")
+		}
+		curr = curr.cdr
+	}
+
+	return &Node{
+		t: NodeString,
+		v: buf.String(),
+	}, nil
 }
