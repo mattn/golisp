@@ -30,6 +30,55 @@ func init() {
 	ops["cons"] = doCons
 	ops["car"] = doCar
 	ops["cdr"] = doCdr
+	ops["apply"] = doApply
+}
+
+func eval(env *Env, node *Node) (*Node, error) {
+	var ret *Node
+	switch node.t {
+	case NodeIdent:
+		name := node.v.(string)
+		_, ok := ops[name]
+		if ok {
+			return node, nil
+		}
+		e := env
+		for e != nil {
+			v, ok := e.vars[name]
+			if ok {
+				return v, nil
+			}
+			e = e.env
+		}
+		return nil, fmt.Errorf("undefined symbol: %v", node.v)
+	case NodeCell:
+		if node.car != nil && node.car.t == NodeCell && node.cdr == nil {
+			node = node.car
+		}
+		lhs, err := eval(env, node.car)
+		if err != nil {
+			return nil, err
+		}
+		if lhs != nil && lhs.t == NodeIdent {
+			name := lhs.v.(string)
+			fn, ok := ops[name]
+			if !ok {
+				return nil, fmt.Errorf("invalid op: %v", name)
+			}
+
+			ret, err = fn(env, node.cdr)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			ret = lhs
+		}
+	case NodeQuote:
+		ret = node.car
+	default:
+		ret = node
+	}
+	return ret, nil
 }
 
 func doPrin1(env *Env, node *Node) (*Node, error) {
@@ -564,4 +613,13 @@ func doCdr(env *Env, node *Node) (*Node, error) {
 		return nil, errors.New("invalid arguments")
 	}
 	return node.car.cdr.cdr, nil
+}
+
+func doApply(env *Env, node *Node) (*Node, error) {
+	v := &Node{
+		t:   NodeCell,
+		car: node.car.car,
+		cdr: node.cdr.car.car,
+	}
+	return eval(env, v)
 }
