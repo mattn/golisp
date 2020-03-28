@@ -35,6 +35,31 @@ func init() {
 	ops["concatenate"] = doConcatenate
 }
 
+type Env struct {
+	vars map[string]*Node
+	env  *Env
+}
+
+func NewEnv() *Env {
+	return &Env{
+		vars: make(map[string]*Node),
+		env:  nil,
+	}
+}
+
+func (e *Env) Eval(node *Node) (*Node, error) {
+	var ret *Node
+	var err error
+	for node != nil {
+		ret, err = eval(e, node.car)
+		if err != nil {
+			return nil, err
+		}
+		node = node.cdr
+	}
+	return ret, nil
+}
+
 func eval(env *Env, node *Node) (*Node, error) {
 	var ret *Node
 	switch node.t {
@@ -54,9 +79,6 @@ func eval(env *Env, node *Node) (*Node, error) {
 		}
 		return nil, fmt.Errorf("undefined symbol: %v", node.v)
 	case NodeCell:
-		if node.car != nil && node.car.t == NodeCell && node.cdr == nil {
-			node = node.car
-		}
 		lhs, err := eval(env, node.car)
 		if err != nil {
 			return nil, err
@@ -72,9 +94,8 @@ func eval(env *Env, node *Node) (*Node, error) {
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			ret = lhs
 		}
+		return ret, nil
 	case NodeQuote:
 		ret = node.car
 	default:

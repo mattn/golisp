@@ -277,19 +277,3 @@ func (n *Node) String() string {
 	}
 	return buf.String()
 }
-
-type Env struct {
-	vars map[string]*Node
-	env  *Env
-}
-
-func NewEnv() *Env {
-	return &Env{
-		vars: make(map[string]*Node),
-		env:  nil,
-	}
-}
-
-func (e *Env) Eval(node *Node) (*Node, error) {
-	return eval(e, node)
-}
