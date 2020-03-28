@@ -642,20 +642,23 @@ func doApply(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.cdr == nil || node.cdr.car == nil {
 		return nil, errors.New("invalid arguments")
 	}
+	arg := node.cdr
+	if arg.car.t == NodeQuote {
+		arg = arg.car.car
+	}
 	v := &Node{
 		t:   NodeCell,
 		car: node.car.car,
-		cdr: node.cdr.car.car,
+		cdr: arg,
 	}
 	return eval(env, v)
 }
 
 func doAref(env *Env, node *Node) (*Node, error) {
-	v := &Node{
+	return &Node{
 		t:   NodeAref,
 		car: node.car,
-	}
-	return v, nil
+	}, nil
 }
 
 func doConcatenate(env *Env, node *Node) (*Node, error) {
