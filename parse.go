@@ -87,6 +87,9 @@ func (p *Parser) ParseParen() (*Node, error) {
 	}
 	curr := head
 	for {
+		b, err := p.buf.Peek(1)
+		quote := err == nil && b[0] == ','
+
 		child, err := p.ParseAny()
 		if err != nil {
 			if err == io.EOF {
@@ -97,6 +100,13 @@ func (p *Parser) ParseParen() (*Node, error) {
 		if child == nil {
 			break
 		}
+		if quote {
+			child = &Node{
+				t:   NodeQuote,
+				car: child,
+			}
+		}
+
 		if child.t == NodeIdent && child.v.(string) == "." {
 			child, err = p.ParseAny()
 			if err != nil {
@@ -272,6 +282,12 @@ func (n *Node) String() string {
 		fmt.Fprintf(&buf, "'%v", n.car)
 	case NodeString:
 		fmt.Fprintf(&buf, "%q", n.v)
+	case NodeEnv:
+		if n.car != nil {
+			fmt.Fprintf(&buf, "(defun %v %v %v)", n.v, n.car, n.cdr.car)
+		} else {
+			fmt.Fprintf(&buf, "(defun %v %v)", n.v, n.cdr.car)
+		}
 	default:
 		fmt.Fprint(&buf, n.v)
 	}

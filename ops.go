@@ -36,16 +36,19 @@ func init() {
 	ops["cdr"] = doCdr
 	ops["apply"] = doApply
 	ops["concatenate"] = doConcatenate
+	ops["defun"] = doDefun
 }
 
 type Env struct {
 	vars map[string]*Node
+	fncs map[string]*Node
 	env  *Env
 }
 
 func NewEnv() *Env {
 	return &Env{
 		vars: make(map[string]*Node),
+		fncs: make(map[string]*Node),
 		env:  nil,
 	}
 }
@@ -72,7 +75,17 @@ func eval(env *Env, node *Node) (*Node, error) {
 		if ok {
 			return node, nil
 		}
+
 		e := env
+		for e.env != nil {
+			e = e.env
+		}
+		v, ok := e.fncs[name]
+		if ok {
+			return v, nil
+		}
+
+		e = env
 		for e != nil {
 			v, ok := e.vars[name]
 			if ok {
@@ -94,6 +107,26 @@ func eval(env *Env, node *Node) (*Node, error) {
 			}
 
 			ret, err = fn(env, node.cdr)
+			if err != nil {
+				return nil, err
+			}
+		} else if lhs != nil && lhs.t == NodeEnv {
+			scope := NewEnv()
+			var code *Node
+			if lhs.cdr.cdr != nil {
+				arg := lhs.cdr.car
+				val := node.cdr
+				for arg != nil {
+					scope.vars[arg.car.v.(string)] = val.car
+					arg = arg.cdr
+					val = val.cdr
+				}
+				code = lhs.cdr.cdr.car
+			} else {
+				code = lhs.cdr.car
+			}
+
+			ret, err = eval(scope, code)
 			if err != nil {
 				return nil, err
 			}
@@ -121,7 +154,7 @@ func doPrint(env *Env, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(ret.v)
+	fmt.Println(ret)
 	return ret, nil
 }
 
@@ -747,4 +780,21 @@ func doConcatenate(env *Env, node *Node) (*Node, error) {
 		t: NodeString,
 		v: buf.String(),
 	}, nil
+}
+
+func doDefun(env *Env, node *Node) (*Node, error) {
+	v := &Node{
+		t: NodeEnv,
+		e: env,
+		v: node.car.v,
+	}
+	v.cdr = node.cdr
+
+	global := env
+	for global.env != nil {
+		global = global.env
+	}
+
+	global.fncs[node.car.v.(string)] = v
+	return v, nil
 }
