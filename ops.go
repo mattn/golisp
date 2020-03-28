@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 )
 
 type Fn func(*Env, *Node) (*Node, error)
@@ -44,6 +46,7 @@ type Env struct {
 	vars map[string]*Node
 	fncs map[string]*Node
 	env  *Env
+	out  io.Writer
 }
 
 func NewEnv() *Env {
@@ -51,6 +54,7 @@ func NewEnv() *Env {
 		vars: make(map[string]*Node),
 		fncs: make(map[string]*Node),
 		env:  nil,
+		out:  os.Stdout,
 	}
 }
 
@@ -122,7 +126,11 @@ func eval(env *Env, node *Node) (*Node, error) {
 					arg = arg.cdr
 					val = val.cdr
 				}
-				code = lhs.cdr.cdr.car
+				if lhs.cdr.cdr != nil && lhs.cdr.cdr.car != nil {
+					code = lhs.cdr.cdr.car
+				} else {
+					code = lhs.cdr.car
+				}
 			} else {
 				code = lhs.cdr.car
 			}
@@ -146,7 +154,7 @@ func doPrin1(env *Env, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Print(ret.v)
+	fmt.Fprint(env.out, ret.v)
 	return ret, nil
 }
 
@@ -155,7 +163,7 @@ func doPrint(env *Env, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(ret.v)
+	fmt.Fprintln(env.out, ret.v)
 	return ret, nil
 }
 
@@ -326,12 +334,20 @@ func doMinusOne(env *Env, node *Node) (*Node, error) {
 
 func doMinus(env *Env, node *Node) (*Node, error) {
 	var ret *Node
-
-	ret = &Node{
-		t: NodeInt,
-		v: int64(0),
-	}
+	var err error
 	curr := node
+	if curr.cdr == nil {
+		ret = &Node{
+			t: NodeInt,
+			v: int64(0),
+		}
+	} else {
+		ret, err = eval(env, curr.car)
+		if err != nil {
+			return nil, err
+		}
+		curr = curr.cdr
+	}
 	for curr != nil {
 		v, err := eval(env, curr.car)
 		if err != nil {
@@ -396,12 +412,20 @@ func doMul(env *Env, node *Node) (*Node, error) {
 
 func doDiv(env *Env, node *Node) (*Node, error) {
 	var ret *Node
-
-	ret = &Node{
-		t: NodeInt,
-		v: int64(1),
-	}
+	var err error
 	curr := node
+	if curr.cdr == nil {
+		ret = &Node{
+			t: NodeInt,
+			v: int64(1),
+		}
+	} else {
+		ret, err = eval(env, curr.car)
+		if err != nil {
+			return nil, err
+		}
+		curr = curr.cdr
+	}
 	for curr != nil {
 		v, err := eval(env, curr.car)
 		if err != nil {
