@@ -12,7 +12,7 @@ func TestParse(t *testing.T) {
 	}{
 		{
 			input: "",
-			want:  "()",
+			want:  "nil",
 		},
 		{
 			input: "1",

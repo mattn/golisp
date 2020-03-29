@@ -40,6 +40,8 @@ func init() {
 	ops["apply"] = doApply
 	ops["concatenate"] = doConcatenate
 	ops["defun"] = doDefun
+	ops["quote"] = doQuote
+	ops["getenv"] = doGetenv
 }
 
 type Env struct {
@@ -101,7 +103,11 @@ func eval(env *Env, node *Node) (*Node, error) {
 		return nil, fmt.Errorf("undefined symbol: %v", node.v)
 	case NodeCell:
 		if node.car == nil {
-			return nil, errors.New("illegal function call")
+			//return nil, errors.New("illegal function call")
+			return &Node{
+				t: NodeNil,
+				v: nil,
+			}, nil
 		}
 		lhs, err := eval(env, node.car)
 		if err != nil {
@@ -158,7 +164,11 @@ func doPrin1(env *Env, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprint(env.out, ret.v)
+	if ret.t == NodeNil {
+		fmt.Fprint(env.out, "nil")
+	} else {
+		fmt.Fprint(env.out, ret.v)
+	}
 	return ret, nil
 }
 
@@ -167,7 +177,11 @@ func doPrint(env *Env, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprintln(env.out, ret.v)
+	if ret.t == NodeNil {
+		fmt.Fprintln(env.out, "nil")
+	} else {
+		fmt.Fprintln(env.out, ret.v)
+	}
 	return ret, nil
 }
 
@@ -176,10 +190,10 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 	var err error
 
 	if node.car == nil || node.car.car == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for dotimes")
 	}
 	if node.car == nil || node.car.cdr == nil || node.car.cdr.car == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for dotimes")
 	}
 	v := node.car.car.v.(string)
 	c := node.car.cdr.car.v.(int64)
@@ -472,7 +486,7 @@ func doEqual(env *Env, node *Node) (*Node, error) {
 	}
 
 	if node.cdr == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for equal")
 	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
@@ -513,7 +527,7 @@ func doLess(env *Env, node *Node) (*Node, error) {
 	}
 
 	if node.cdr == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for less")
 	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
@@ -554,7 +568,7 @@ func doIf(env *Env, node *Node) (*Node, error) {
 	}
 
 	if node.car.cdr == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for if")
 	}
 	var b bool
 	switch v.t {
@@ -587,7 +601,7 @@ func doNot(env *Env, node *Node) (*Node, error) {
 	}
 
 	if node.car.cdr == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for not")
 	}
 	var b bool
 	switch v.t {
@@ -620,7 +634,7 @@ func doMod(env *Env, node *Node) (*Node, error) {
 	}
 
 	if node.cdr == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for mod")
 	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
@@ -654,7 +668,7 @@ func doAnd(env *Env, node *Node) (*Node, error) {
 	}
 
 	if node.cdr == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for and")
 	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
@@ -699,7 +713,7 @@ func doOr(env *Env, node *Node) (*Node, error) {
 	}
 
 	if node.cdr == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for or")
 	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
@@ -747,7 +761,7 @@ func doCond(env *Env, node *Node) (*Node, error) {
 	curr := node
 	for curr != nil {
 		if curr.car == nil || curr.car.cdr == nil {
-			return nil, errors.New("invalid arguments")
+			return nil, errors.New("invalid arguments for cond")
 		}
 		ret, err = eval(env, curr.car.car)
 		if err != nil {
@@ -781,7 +795,7 @@ func doCons(env *Env, node *Node) (*Node, error) {
 	}
 
 	if node.cdr == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for cons")
 	}
 	rhs, err := eval(env, node.cdr.car)
 	if err != nil {
@@ -796,22 +810,28 @@ func doCons(env *Env, node *Node) (*Node, error) {
 }
 
 func doCar(env *Env, node *Node) (*Node, error) {
-	if node.car == nil || node.car.cdr == nil {
-		return nil, errors.New("invalid arguments")
+	vv, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
 	}
-	return node.car.cdr.car, nil
+	if vv.car == nil {
+		return &Node{
+			t: NodeNil,
+		}, nil
+	}
+	return vv.car, nil
 }
 
 func doCdr(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.car.cdr == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for cdr")
 	}
 	return node.car.cdr.cdr, nil
 }
 
 func doApply(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.cdr == nil || node.cdr.car == nil {
-		return nil, errors.New("invalid arguments")
+		return nil, errors.New("invalid arguments for apply")
 	}
 	arg := node.cdr
 	if arg.car.t == NodeQuote {
@@ -844,7 +864,7 @@ func doConcatenate(env *Env, node *Node) (*Node, error) {
 		case NodeString:
 			buf.WriteString(v.v.(string))
 		default:
-			return nil, errors.New("invalid arguments")
+			return nil, errors.New("invalid arguments for concatenate")
 		}
 		curr = curr.cdr
 	}
@@ -870,4 +890,22 @@ func doDefun(env *Env, node *Node) (*Node, error) {
 
 	global.fncs[node.car.v.(string)] = v
 	return v, nil
+}
+
+func doQuote(env *Env, node *Node) (*Node, error) {
+	return &Node{
+		t: NodeQuote,
+		v: node,
+	}, nil
+}
+
+func doGetenv(env *Env, node *Node) (*Node, error) {
+	vv, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+	return &Node{
+		t: NodeString,
+		v: os.Getenv(fmt.Sprint(vv.v)),
+	}, nil
 }

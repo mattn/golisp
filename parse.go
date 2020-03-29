@@ -3,6 +3,7 @@ package golisp
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -75,7 +76,7 @@ func (p *Parser) SkipWhite() {
 			continue
 		}
 		if !unicode.IsSpace(r) {
-			p.buf.UnreadRune()
+			p.unreadRune()
 			return
 		}
 	}
@@ -87,14 +88,18 @@ func (p *Parser) ParseParen() (*Node, error) {
 	}
 	curr := head
 	for {
+		p.SkipWhite()
 		b, err := p.buf.Peek(1)
+		if err == io.EOF || (len(b) > 0 && b[0] == ')') {
+			break
+		}
 		quote := err == nil && b[0] == ','
+		if quote {
+			p.buf.ReadByte()
+		}
 
 		child, err := p.ParseAny()
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
 			return nil, err
 		}
 		if child == nil {
@@ -123,6 +128,10 @@ func (p *Parser) ParseParen() (*Node, error) {
 		}
 		curr.car = child
 	}
+	if head.car == nil && head.cdr == nil {
+		head.t = NodeNil
+	}
+
 	return head, nil
 }
 
@@ -162,6 +171,12 @@ func (p *Parser) readRune() (rune, error) {
 	return r, err
 }
 
+func (p *Parser) unreadRune() error {
+	err := p.buf.UnreadRune()
+	p.pos -= 1
+	return err
+}
+
 func (p *Parser) ParsePrimitive() (*Node, error) {
 	var buf bytes.Buffer
 	for {
@@ -174,7 +189,7 @@ func (p *Parser) ParsePrimitive() (*Node, error) {
 		}
 
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !isSymbolLetter(r) {
-			p.buf.UnreadRune()
+			p.unreadRune()
 			break
 		}
 		buf.WriteRune(r)
@@ -222,14 +237,19 @@ func (p *Parser) ParseAny() (*Node, error) {
 		return nil, err
 	}
 
-	if r == ')' {
-		return nil, nil
-	}
 	if r == '(' {
-		return p.ParseParen()
+		node, err := p.ParseParen()
+		if err != nil {
+			return nil, err
+		}
+		r, err := p.readRune()
+		if err != nil || r != ')' {
+			return nil, errors.New("unexpected end of file")
+		}
+		return node, nil
 	}
 	if unicode.IsLetter(r) || unicode.IsDigit(r) || isSymbolLetter(r) {
-		p.buf.UnreadRune()
+		p.unreadRune()
 		return p.ParsePrimitive()
 	}
 	if r == '\'' {
