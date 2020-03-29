@@ -88,13 +88,13 @@ func (p *Parser) ParseParen() (*Node, error) {
 	curr := head
 	for {
 		b, err := p.buf.Peek(1)
+		if err == nil && b[0] == ')' {
+			break
+		}
 		quote := err == nil && b[0] == ','
 
 		child, err := p.ParseAny()
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
 			return nil, err
 		}
 		if child == nil {
@@ -226,7 +226,18 @@ func (p *Parser) ParseAny() (*Node, error) {
 		return nil, nil
 	}
 	if r == '(' {
-		return p.ParseParen()
+		node, err := p.ParseParen()
+		if err != nil {
+			return nil, err
+		}
+		b, err := p.buf.Peek(1)
+		if err != nil {
+			return nil, err
+		}
+		if b[0] != ')' {
+			return nil, fmt.Errorf("unexpected end of file: %v", string(b))
+		}
+		return node, err
 	}
 	if unicode.IsLetter(r) || unicode.IsDigit(r) || isSymbolLetter(r) {
 		p.buf.UnreadRune()

@@ -100,6 +100,9 @@ func eval(env *Env, node *Node) (*Node, error) {
 		}
 		return nil, fmt.Errorf("undefined symbol: %v", node.v)
 	case NodeCell:
+		if node.car == nil {
+			return nil, errors.New("illegal function call")
+		}
 		lhs, err := eval(env, node.car)
 		if err != nil {
 			return nil, err
@@ -117,6 +120,7 @@ func eval(env *Env, node *Node) (*Node, error) {
 			}
 		} else if lhs != nil && lhs.t == NodeEnv {
 			scope := NewEnv()
+			scope.env = env
 			var code *Node
 			if lhs.cdr.car != nil {
 				arg := lhs.cdr.car
@@ -181,6 +185,7 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 	c := node.car.cdr.car.v.(int64)
 
 	scope := NewEnv()
+	scope.env = env
 	vv := &Node{
 		t: NodeInt,
 		v: int64(0),
@@ -191,13 +196,17 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 	node = node.cdr
 	for i := int64(0); i < c; i++ {
 		vv.v = i
-		curr := node
-		for curr != nil {
-			ret, err = eval(scope, curr.car)
-			if err != nil {
-				return nil, err
+		if node != nil {
+			curr := node
+			for curr != nil {
+				ret, err = eval(scope, curr.car)
+				if err != nil {
+					return nil, err
+				}
+				curr = curr.cdr
 			}
-			curr = curr.cdr
+		} else {
+			ret = vv
 		}
 	}
 	return ret, nil
@@ -206,14 +215,17 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 func doLet(env *Env, node *Node) (*Node, error) {
 	var ret *Node
 	var err error
-	v := node.car.car.v.(string)
+	v, err := eval(env, node.car.car)
+	if err != nil {
+		return nil, err
+	}
 	vv, err := eval(env, node.cdr)
 	if err != nil {
 		return nil, err
 	}
 	scope := NewEnv()
 	scope.env = env
-	scope.vars[v] = vv
+	scope.vars[v.v.(string)] = vv
 	curr := node.cdr
 	for curr != nil {
 		ret, err = eval(scope, curr.car)
@@ -729,6 +741,9 @@ func doCond(env *Env, node *Node) (*Node, error) {
 	var ret *Node
 	var err error
 
+	ret = &Node{
+		t: NodeNil,
+	}
 	curr := node
 	for curr != nil {
 		if curr.car == nil || curr.car.cdr == nil {
