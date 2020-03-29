@@ -10,38 +10,49 @@ import (
 
 type Fn func(*Env, *Node) (*Node, error)
 
-var ops map[string]Fn
+type FnType struct {
+	special bool
+	fn      Fn
+}
+
+var ops map[string]FnType
+
+func makeFn(special bool, fn Fn) FnType {
+	return FnType{special: special, fn: fn}
+}
 
 func init() {
-	ops = make(map[string]Fn)
-	ops["dotimes"] = doDotimes
-	ops["prin1"] = doPrin1
-	ops["print"] = doPrint
-	ops["let"] = doLet
-	ops["setq"] = doSetq
-	ops["1+"] = doPlusOne
-	ops["1-"] = doMinusOne
-	ops["+"] = doPlus
-	ops["-"] = doMinus
-	ops["*"] = doMul
-	ops["/"] = doDiv
-	ops["<"] = doLess
-	ops["="] = doEqual
-	ops["if"] = doIf
-	ops["not"] = doNot
-	ops["mod"] = doMod
-	ops["%"] = doMod
-	ops["and"] = doAnd
-	ops["or"] = doOr
-	ops["cond"] = doCond
-	ops["cons"] = doCons
-	ops["car"] = doCar
-	ops["cdr"] = doCdr
-	ops["apply"] = doApply
-	ops["concatenate"] = doConcatenate
-	ops["defun"] = doDefun
-	ops["quote"] = doQuote
-	ops["getenv"] = doGetenv
+	ops = make(map[string]FnType)
+	ops["dotimes"] = makeFn(false, doDotimes)
+	ops["prin1"] = makeFn(false, doPrin1)
+	ops["print"] = makeFn(false, doPrint)
+	ops["let"] = makeFn(false, doLet)
+	ops["setq"] = makeFn(true, doSetq)
+	ops["1+"] = makeFn(false, doPlusOne)
+	ops["1-"] = makeFn(false, doMinusOne)
+	ops["+"] = makeFn(false, doPlus)
+	ops["-"] = makeFn(false, doMinus)
+	ops["*"] = makeFn(false, doMul)
+	ops["/"] = makeFn(false, doDiv)
+	ops["<"] = makeFn(false, doLess)
+	ops["="] = makeFn(false, doEqual)
+	ops["if"] = makeFn(false, doIf)
+	ops["not"] = makeFn(false, doNot)
+	ops["mod"] = makeFn(false, doMod)
+	ops["%"] = makeFn(false, doMod)
+	ops["and"] = makeFn(false, doAnd)
+	ops["or"] = makeFn(false, doOr)
+	ops["cond"] = makeFn(false, doCond)
+	ops["cons"] = makeFn(false, doCons)
+	ops["car"] = makeFn(false, doCar)
+	ops["cdr"] = makeFn(false, doCdr)
+	ops["apply"] = makeFn(false, doApply)
+	ops["concatenate"] = makeFn(false, doConcatenate)
+	ops["defun"] = makeFn(true, doDefun)
+	ops["quote"] = makeFn(false, doQuote)
+	ops["getenv"] = makeFn(false, doGetenv)
+	ops["length"] = makeFn(false, doLength)
+	ops["null"] = makeFn(false, doNull)
 }
 
 type Env struct {
@@ -51,19 +62,23 @@ type Env struct {
 	out  io.Writer
 }
 
-func NewEnv() *Env {
+func NewEnv(env *Env) *Env {
+	var out io.Writer = os.Stdout
+	if env != nil {
+		out = env.out
+	}
 	return &Env{
 		vars: make(map[string]*Node),
 		fncs: make(map[string]*Node),
-		env:  nil,
-		out:  os.Stdout,
+		env:  env,
+		out:  out,
 	}
 }
 
 func (e *Env) Eval(node *Node) (*Node, error) {
 	var ret *Node
 	var err error
-	for node != nil {
+	for node != nil && node.car != nil {
 		ret, err = eval(e, node.car)
 		if err != nil {
 			return nil, err
@@ -103,46 +118,78 @@ func eval(env *Env, node *Node) (*Node, error) {
 		return nil, fmt.Errorf("undefined symbol: %v", node.v)
 	case NodeCell:
 		if node.car == nil {
-			//return nil, errors.New("illegal function call")
 			return &Node{
 				t: NodeNil,
 				v: nil,
 			}, nil
 		}
-		lhs, err := eval(env, node.car)
-		if err != nil {
-			return nil, err
-		}
-		if lhs != nil && lhs.t == NodeIdent {
-			name := lhs.v.(string)
-			fn, ok := ops[name]
+		var err error
+		if node.car != nil && node.car.t == NodeIdent {
+			name := node.car.v.(string)
+			ft, ok := ops[name]
 			if !ok {
 				return nil, fmt.Errorf("invalid op: %v", name)
 			}
 
-			ret, err = fn(env, node.cdr)
-			if err != nil {
-				return nil, err
+			if ft.special {
+				ret, err = ft.fn(env, node.cdr)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				head := &Node{
+					t: NodeCell,
+					car: &Node{
+						t: NodeNil,
+					},
+					cdr: &Node{
+						t: NodeNil,
+					},
+				}
+				arg := head
+				if node.cdr != nil {
+					curr := node.cdr
+					for curr != nil && curr.car != nil {
+						vv, err := eval(env, curr.car)
+						if err != nil {
+							return nil, err
+						}
+						arg.cdr = &Node{
+							t:   NodeCell,
+							car: vv,
+						}
+						arg = arg.cdr
+						curr = curr.cdr
+					}
+				}
+				newenv := NewEnv(env)
+				ret, err = ft.fn(newenv, head.cdr)
+				if err != nil {
+					return nil, err
+				}
 			}
-		} else if lhs != nil && lhs.t == NodeEnv {
-			scope := NewEnv()
-			scope.env = env
+		} else if node.car != nil && node.car.t == NodeEnv {
+			scope := NewEnv(env)
 			var code *Node
-			if lhs.cdr.car != nil {
-				arg := lhs.cdr.car
+			if node.car.cdr.car != nil {
+				arg := node.car.cdr.car
 				val := node.cdr
 				for arg != nil && arg.car != nil {
-					scope.vars[arg.car.v.(string)] = val.car
+					vv, err := eval(env, val.car)
+					if err != nil {
+						return nil, err
+					}
+					scope.vars[arg.car.v.(string)] = vv
 					arg = arg.cdr
 					val = val.cdr
 				}
-				if lhs.cdr.cdr != nil && lhs.cdr.cdr.car != nil {
-					code = lhs.cdr.cdr.car
+				if node.car.cdr.cdr != nil && node.car.cdr.cdr.car != nil {
+					code = node.car.cdr.cdr.car
 				} else {
-					code = lhs.cdr.car
+					code = node.car.cdr.car
 				}
 			} else {
-				code = lhs.cdr.car
+				code = node.car.cdr.car
 			}
 
 			ret, err = eval(scope, code)
@@ -160,33 +207,34 @@ func eval(env *Env, node *Node) (*Node, error) {
 }
 
 func doPrin1(env *Env, node *Node) (*Node, error) {
-	ret, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for prin1")
 	}
-	if ret.t == NodeNil {
+	if node.car.t == NodeNil {
 		fmt.Fprint(env.out, "nil")
 	} else {
-		fmt.Fprint(env.out, ret.v)
+		fmt.Fprint(env.out, node.car.v)
 	}
-	return ret, nil
+	return node.car, nil
 }
 
 func doPrint(env *Env, node *Node) (*Node, error) {
-	ret, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for print")
 	}
-	if ret.t == NodeNil {
+	if node.car.t == NodeNil {
 		fmt.Fprintln(env.out, "nil")
+	} else if node.car.t == NodeQuote {
+		fmt.Fprintln(env.out, node.car)
+	} else if node.car.t == NodeCell {
+		fmt.Fprintln(env.out, node.car)
 	} else {
-		fmt.Fprintln(env.out, ret.v)
+		fmt.Fprintln(env.out, node.car.v)
 	}
-	return ret, nil
+	return node.car, nil
 }
 
 func doDotimes(env *Env, node *Node) (*Node, error) {
-	var ret *Node
 	var err error
 
 	if node.car == nil || node.car.car == nil {
@@ -198,8 +246,7 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 	v := node.car.car.v.(string)
 	c := node.car.cdr.car.v.(int64)
 
-	scope := NewEnv()
-	scope.env = env
+	scope := NewEnv(env)
 	vv := &Node{
 		t: NodeInt,
 		v: int64(0),
@@ -213,17 +260,17 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 		if node != nil {
 			curr := node
 			for curr != nil {
-				ret, err = eval(scope, curr.car)
+				_, err = eval(scope, curr.car)
 				if err != nil {
 					return nil, err
 				}
 				curr = curr.cdr
 			}
-		} else {
-			ret = vv
 		}
 	}
-	return ret, nil
+	return &Node{
+		t: NodeNil,
+	}, nil
 }
 
 func doLet(env *Env, node *Node) (*Node, error) {
@@ -237,8 +284,7 @@ func doLet(env *Env, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	scope := NewEnv()
-	scope.env = env
+	scope := NewEnv(env)
 	scope.vars[v.v.(string)] = vv
 	curr := node.cdr
 	for curr != nil {
@@ -252,74 +298,69 @@ func doLet(env *Env, node *Node) (*Node, error) {
 }
 
 func doSetq(env *Env, node *Node) (*Node, error) {
-	v := node.car.v.(string)
-	vv, err := eval(env, node.cdr.car)
-	if err != nil {
-		return nil, err
+	if node.car == nil || node.car.t != NodeIdent {
+		return nil, errors.New("invalid arguments for setq")
 	}
-	env.vars[v] = vv
-	return vv, nil
+	env.vars[node.car.v.(string)] = node.cdr.car
+	return node.cdr.car, nil
 }
 
 func doPlusOne(env *Env, node *Node) (*Node, error) {
-	var ret *Node
-
-	ret = &Node{
-		t: NodeInt,
-		v: int64(0),
+	if node.car == nil || (node.car.t != NodeInt && node.car.t != NodeDouble) {
+		return nil, errors.New("invalid arguments for 1+")
 	}
-	v, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
+
+	ret := &Node{
+		t: node.car.t,
+		v: node.car.v,
 	}
 	switch ret.t {
 	case NodeInt:
-		switch v.t {
-		case NodeInt:
-			ret.v = v.v.(int64) + 1
-		case NodeDouble:
-			ret.v = v.v.(float64) + 1
-			ret.t = NodeDouble
-		}
+		ret.v = ret.v.(int64) + 1
 	case NodeDouble:
-		switch v.t {
-		case NodeInt:
-			ret.v = float64(v.v.(int64)) + 1
-		case NodeDouble:
-			ret.v = v.v.(float64) + 1
-		}
+		ret.v = ret.v.(float64) + 1
+	default:
+		return nil, errors.New("invalid arguments for 1+")
 	}
 	return ret, nil
 }
 
 func doPlus(env *Env, node *Node) (*Node, error) {
-	var ret *Node
-
-	ret = &Node{
-		t: NodeInt,
-		v: int64(0),
+	if node.car == nil {
+		return &Node{
+			t: NodeInt,
+			v: int64(0),
+		}, nil
 	}
-	curr := node
+	if node.car.t != NodeInt && node.car.t != NodeDouble {
+		return nil, errors.New("invalid arguments for +")
+	}
+
+	ret := &Node{
+		t: node.car.t,
+		v: node.car.v,
+	}
+	curr := node.cdr
 	for curr != nil {
-		v, err := eval(env, curr.car)
-		if err != nil {
-			return nil, err
-		}
 		switch ret.t {
 		case NodeInt:
-			switch v.t {
+			switch curr.car.t {
 			case NodeInt:
-				ret.v = ret.v.(int64) + v.v.(int64)
+				ret.v = ret.v.(int64) + curr.car.v.(int64)
 			case NodeDouble:
-				ret.v = float64(ret.v.(int64)) + v.v.(float64)
+				ret.v = float64(ret.v.(int64)) + curr.car.v.(float64)
 				ret.t = NodeDouble
+			default:
+				return nil, errors.New("invalid arguments for +")
 			}
 		case NodeDouble:
-			switch v.t {
+			switch curr.car.t {
 			case NodeInt:
-				ret.v = ret.v.(float64) + float64(v.v.(int64))
+				ret.v = ret.v.(float64) + float64(curr.car.v.(int64))
 			case NodeDouble:
-				ret.v = ret.v.(float64) + v.v.(float64)
+				ret.v = ret.v.(float64) + curr.car.v.(float64)
+			default:
+				return nil, errors.New("invalid arguments for +")
 			}
 		}
 		curr = curr.cdr
@@ -328,39 +369,31 @@ func doPlus(env *Env, node *Node) (*Node, error) {
 }
 
 func doMinusOne(env *Env, node *Node) (*Node, error) {
-	var ret *Node
-
-	ret = &Node{
-		t: NodeInt,
-		v: int64(0),
+	if node.car == nil || (node.car.t != NodeInt && node.car.t != NodeDouble) {
+		return nil, errors.New("invalid arguments for 1-")
 	}
-	v, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
+
+	ret := &Node{
+		t: node.car.t,
+		v: node.car.v,
 	}
 	switch ret.t {
 	case NodeInt:
-		switch v.t {
-		case NodeInt:
-			ret.v = v.v.(int64) - 1
-		case NodeDouble:
-			ret.v = v.v.(float64) - 1
-			ret.t = NodeDouble
-		}
+		ret.v = ret.v.(int64) - 1
 	case NodeDouble:
-		switch v.t {
-		case NodeInt:
-			ret.v = float64(v.v.(int64)) - 1
-		case NodeDouble:
-			ret.v = v.v.(float64) - 1
-		}
+		ret.v = ret.v.(float64) - 1
+	default:
+		return nil, errors.New("invalid arguments for 1-")
 	}
 	return ret, nil
 }
 
 func doMinus(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || (node.car.t != NodeInt && node.car.t != NodeDouble) {
+		return nil, errors.New("invalid arguments for -")
+	}
+
 	var ret *Node
-	var err error
 	curr := node
 	if curr.cdr == nil {
 		ret = &Node{
@@ -368,32 +401,32 @@ func doMinus(env *Env, node *Node) (*Node, error) {
 			v: int64(0),
 		}
 	} else {
-		ret, err = eval(env, curr.car)
-		if err != nil {
-			return nil, err
+		ret = &Node{
+			t: node.car.t,
+			v: node.car.v,
 		}
 		curr = curr.cdr
 	}
 	for curr != nil {
-		v, err := eval(env, curr.car)
-		if err != nil {
-			return nil, err
-		}
 		switch ret.t {
 		case NodeInt:
-			switch v.t {
+			switch curr.car.t {
 			case NodeInt:
-				ret.v = ret.v.(int64) - v.v.(int64)
+				ret.v = ret.v.(int64) - curr.car.v.(int64)
 			case NodeDouble:
-				ret.v = float64(ret.v.(int64)) - v.v.(float64)
+				ret.v = float64(ret.v.(int64)) - curr.car.v.(float64)
 				ret.t = NodeDouble
+			default:
+				return nil, errors.New("invalid arguments for -")
 			}
 		case NodeDouble:
-			switch v.t {
+			switch curr.car.t {
 			case NodeInt:
-				ret.v = ret.v.(float64) - float64(v.v.(int64))
+				ret.v = ret.v.(float64) - float64(curr.car.v.(int64))
 			case NodeDouble:
-				ret.v = ret.v.(float64) - v.v.(float64)
+				ret.v = ret.v.(float64) - curr.car.v.(float64)
+			default:
+				return nil, errors.New("invalid arguments for -")
 			}
 		}
 		curr = curr.cdr
@@ -402,33 +435,41 @@ func doMinus(env *Env, node *Node) (*Node, error) {
 }
 
 func doMul(env *Env, node *Node) (*Node, error) {
-	var ret *Node
-
-	ret = &Node{
-		t: NodeInt,
-		v: int64(1),
+	if node.car == nil {
+		return &Node{
+			t: NodeInt,
+			v: int64(1),
+		}, nil
 	}
-	curr := node
+	if node.car.t != NodeInt && node.car.t != NodeDouble {
+		return nil, errors.New("invalid arguments for *")
+	}
+
+	ret := &Node{
+		t: node.car.t,
+		v: node.car.v,
+	}
+	curr := node.cdr
 	for curr != nil {
-		v, err := eval(env, curr.car)
-		if err != nil {
-			return nil, err
-		}
 		switch ret.t {
 		case NodeInt:
-			switch v.t {
+			switch curr.car.t {
 			case NodeInt:
-				ret.v = ret.v.(int64) * v.v.(int64)
+				ret.v = ret.v.(int64) * curr.car.v.(int64)
 			case NodeDouble:
-				ret.v = float64(ret.v.(int64)) * v.v.(float64)
+				ret.v = float64(ret.v.(int64)) * curr.car.v.(float64)
 				ret.t = NodeDouble
+			default:
+				return nil, errors.New("invalid arguments for *")
 			}
 		case NodeDouble:
-			switch v.t {
+			switch curr.car.t {
 			case NodeInt:
-				ret.v = ret.v.(float64) * float64(v.v.(int64))
+				ret.v = ret.v.(float64) * float64(curr.car.v.(int64))
 			case NodeDouble:
-				ret.v = ret.v.(float64) * v.v.(float64)
+				ret.v = ret.v.(float64) * curr.car.v.(float64)
+			default:
+				return nil, errors.New("invalid arguments for *")
 			}
 		}
 		curr = curr.cdr
@@ -437,41 +478,51 @@ func doMul(env *Env, node *Node) (*Node, error) {
 }
 
 func doDiv(env *Env, node *Node) (*Node, error) {
-	var ret *Node
-	var err error
-	curr := node
-	if curr.cdr == nil {
-		ret = &Node{
-			t: NodeInt,
-			v: int64(1),
-		}
-	} else {
-		ret, err = eval(env, curr.car)
-		if err != nil {
-			return nil, err
-		}
-		curr = curr.cdr
+	if node.car == nil || (node.car.t != NodeInt && node.car.t != NodeDouble) {
+		return nil, errors.New("invalid arguments for /")
 	}
-	for curr != nil {
-		v, err := eval(env, curr.car)
-		if err != nil {
-			return nil, err
+	if node.cdr == nil {
+		switch node.car.t {
+		case NodeInt:
+			return &Node{
+				t: NodeInt,
+				v: 1 / node.car.v.(int64),
+			}, nil
+		case NodeDouble:
+			return &Node{
+				t: NodeDouble,
+				v: 1.0 / node.car.v.(float64),
+			}, nil
+		default:
+			return nil, errors.New("invalid arguments for /")
 		}
+	}
+
+	ret := &Node{
+		t: node.car.t,
+		v: node.car.v,
+	}
+	curr := node.cdr
+	for curr != nil {
 		switch ret.t {
 		case NodeInt:
-			switch v.t {
+			switch curr.car.t {
 			case NodeInt:
-				ret.v = ret.v.(int64) / v.v.(int64)
+				ret.v = ret.v.(int64) / curr.car.v.(int64)
 			case NodeDouble:
-				ret.v = float64(ret.v.(int64)) / v.v.(float64)
+				ret.v = float64(ret.v.(int64)) / curr.car.v.(float64)
 				ret.t = NodeDouble
+			default:
+				return nil, errors.New("invalid arguments for /")
 			}
 		case NodeDouble:
-			switch v.t {
+			switch curr.car.t {
 			case NodeInt:
-				ret.v = ret.v.(float64) / float64(v.v.(int64))
+				ret.v = ret.v.(float64) / float64(curr.car.v.(int64))
 			case NodeDouble:
-				ret.v = ret.v.(float64) / v.v.(float64)
+				ret.v = ret.v.(float64) / curr.car.v.(float64)
+			default:
+				return nil, errors.New("invalid arguments for /")
 			}
 		}
 		curr = curr.cdr
@@ -810,23 +861,21 @@ func doCons(env *Env, node *Node) (*Node, error) {
 }
 
 func doCar(env *Env, node *Node) (*Node, error) {
-	vv, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
-	}
-	if vv.car == nil {
+	if node.car == nil || node.car.car == nil {
 		return &Node{
 			t: NodeNil,
 		}, nil
 	}
-	return vv.car, nil
+	return node.car.car, nil
 }
 
 func doCdr(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.car.cdr == nil {
-		return nil, errors.New("invalid arguments for cdr")
+		return &Node{
+			t: NodeNil,
+		}, nil
 	}
-	return node.car.cdr.cdr, nil
+	return node.car.cdr, nil
 }
 
 func doApply(env *Env, node *Node) (*Node, error) {
@@ -856,13 +905,9 @@ func doConcatenate(env *Env, node *Node) (*Node, error) {
 	var buf bytes.Buffer
 	curr := node
 	for curr != nil {
-		v, err := eval(env, curr.car)
-		if err != nil {
-			return nil, err
-		}
-		switch v.t {
+		switch curr.car.t {
 		case NodeString:
-			buf.WriteString(v.v.(string))
+			buf.WriteString(curr.car.v.(string))
 		default:
 			return nil, errors.New("invalid arguments for concatenate")
 		}
@@ -900,12 +945,50 @@ func doQuote(env *Env, node *Node) (*Node, error) {
 }
 
 func doGetenv(env *Env, node *Node) (*Node, error) {
-	vv, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
+	if node.car == nil || node.car.t != NodeString {
+		return nil, errors.New("invalid arguments for getenv")
 	}
 	return &Node{
 		t: NodeString,
-		v: os.Getenv(fmt.Sprint(vv.v)),
+		v: os.Getenv(node.car.v.(string)),
+	}, nil
+}
+
+func doLength(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for length")
+	}
+	var l int64
+	switch node.car.t {
+	case NodeString:
+		l = int64(len(node.car.v.(string)))
+	case NodeCell:
+		curr := node
+		for curr != nil {
+			l++
+			curr = curr.cdr
+		}
+	case NodeNil:
+		l = 0
+	}
+	return &Node{
+		t: NodeInt,
+		v: l,
+	}, nil
+}
+
+func doNull(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for length")
+	}
+	if node.car.t == NodeT {
+		return &Node{
+			t: NodeT,
+			v: true,
+		}, nil
+	}
+
+	return &Node{
+		t: NodeNil,
 	}, nil
 }

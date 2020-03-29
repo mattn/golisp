@@ -30,7 +30,7 @@ func TestOps(t *testing.T) {
 			continue
 		}
 		var buf bytes.Buffer
-		env := NewEnv()
+		env := NewEnv(nil)
 		env.out = &buf
 		_, err = env.Eval(node)
 		if err != nil {

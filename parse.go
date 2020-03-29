@@ -122,6 +122,9 @@ func (p *Parser) ParseParen() (*Node, error) {
 		} else if head.car != nil {
 			x := &Node{
 				t: NodeCell,
+				car: &Node{
+					t: NodeNil,
+				},
 			}
 			curr.cdr = x
 			curr = x

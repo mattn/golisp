@@ -12,7 +12,7 @@ import (
 )
 
 func repl() {
-	env := golisp.NewEnv()
+	env := golisp.NewEnv(nil)
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print("> ")
@@ -45,7 +45,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	env := golisp.NewEnv()
+	env := golisp.NewEnv(nil)
 	_, err = env.Eval(node)
 	if err != nil {
 		log.Fatal(err)
