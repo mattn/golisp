@@ -224,6 +224,8 @@ func doPrint(env *Env, node *Node) (*Node, error) {
 	}
 	if node.car.t == NodeNil {
 		fmt.Fprintln(env.out, "nil")
+	} else if node.car.t == NodeT {
+		fmt.Fprintln(env.out, "t")
 	} else if node.car.t == NodeQuote {
 		fmt.Fprintln(env.out, node.car)
 	} else if node.car.t == NodeCell {
@@ -866,6 +868,12 @@ func doCar(env *Env, node *Node) (*Node, error) {
 			t: NodeNil,
 		}, nil
 	}
+	if node.car.t == NodeQuote {
+		return &Node{
+			t: NodeIdent,
+			v: "quote",
+		}, nil
+	}
 	return node.car.car, nil
 }
 
@@ -963,7 +971,7 @@ func doLength(env *Env, node *Node) (*Node, error) {
 	case NodeString:
 		l = int64(len(node.car.v.(string)))
 	case NodeCell:
-		curr := node
+		curr := node.car
 		for curr != nil {
 			l++
 			curr = curr.cdr
@@ -981,7 +989,7 @@ func doNull(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
 		return nil, errors.New("invalid arguments for length")
 	}
-	if node.car.t == NodeT {
+	if node.car.t == NodeNil {
 		return &Node{
 			t: NodeT,
 			v: true,
