@@ -40,15 +40,16 @@ func TestParse(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		t.Logf("%q", test.input)
 		parser := NewParser(strings.NewReader(test.input))
 		node, err := parser.ParseParen()
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 		got := node.String()
 
 		if got != test.want {
-			t.Fatalf("want %q for %q but got %q", test.want, test.input, got)
+			t.Errorf("want %q for %q but got %q", test.want, test.input, got)
 		}
 	}
 }
