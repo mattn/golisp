@@ -1,0 +1,7 @@
+(print (progn))
+(print (progn 1 2 3))
+(setq x 'y)
+(setq y 10)
+(print (progn x))
+(print (progn nil nil nil))
+(print (eval (cons 'progn nil)))

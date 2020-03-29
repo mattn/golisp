@@ -1,0 +1,5 @@
+(print (list))
+(print (list (+ 1 2) '(+ 3 4) (+ 5 6)))
+(setq x 'a y '(10 20 30) z nil)
+(print (list x y z))
+(print (apply 'list `(,(+ 1 2) (+ 3 4) ,(+ 5 6))))

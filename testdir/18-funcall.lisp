@@ -1,0 +1,7 @@
+(setq x (lambda (a b) (+ a b)))
+(print (funcall x 1 2))
+(setq print 10)
+(funcall 'print 20)
+(print (funcall '+))
+(print (funcall '+ (+ 1 2 3) (+ 4 5 6)))
+(print (funcall 'apply '+ (+ 1 2 3) (+ 4 5 6) nil))
