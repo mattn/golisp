@@ -277,25 +277,25 @@ func (n *Node) String() string {
 	case NodeCell:
 		curr := n
 		fmt.Fprint(&buf, "(")
-		if curr.car != nil || curr.cdr != nil {
-			for curr != nil {
-				if curr.car != nil {
-					fmt.Fprint(&buf, curr.car)
-				} else {
-					fmt.Fprint(&buf, "nil")
-				}
-				if curr.cdr == nil {
-					break
-				}
-				if curr.cdr.t != NodeCell {
-					fmt.Fprint(&buf, " . ")
-					fmt.Fprint(&buf, curr.cdr)
-					break
-				}
-				fmt.Fprint(&buf, " ")
-				curr = curr.cdr
+		//if curr.car != nil || curr.cdr != nil {
+		for curr != nil {
+			if curr.car != nil {
+				fmt.Fprint(&buf, curr.car)
+			} else {
+				fmt.Fprint(&buf, "nil")
 			}
+			if curr.cdr == nil || curr.cdr.t == NodeNil {
+				break
+			}
+			if curr.cdr.t != NodeCell {
+				fmt.Fprint(&buf, " . ")
+				fmt.Fprint(&buf, curr.cdr)
+				break
+			}
+			fmt.Fprint(&buf, " ")
+			curr = curr.cdr
 		}
+		//}
 		fmt.Fprint(&buf, ")")
 	case NodeNil:
 		fmt.Fprint(&buf, "nil")

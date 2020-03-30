@@ -34,7 +34,8 @@ func init() {
 	ops["-"] = makeFn(false, doMinus)
 	ops["*"] = makeFn(false, doMul)
 	ops["/"] = makeFn(false, doDiv)
-	ops["<"] = makeFn(false, doLess)
+	ops["<"] = makeFn(false, doLt)
+	ops[">"] = makeFn(false, doGt)
 	ops["="] = makeFn(false, doEqual)
 	ops["if"] = makeFn(false, doIf)
 	ops["not"] = makeFn(false, doNot)
@@ -46,6 +47,8 @@ func init() {
 	ops["cons"] = makeFn(false, doCons)
 	ops["car"] = makeFn(false, doCar)
 	ops["cdr"] = makeFn(false, doCdr)
+	ops["first"] = makeFn(false, doCar)
+	ops["rest"] = makeFn(false, doCdr)
 	ops["apply"] = makeFn(false, doApply)
 	ops["concatenate"] = makeFn(false, doConcatenate)
 	ops["defun"] = makeFn(true, doDefun)
@@ -298,6 +301,9 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 }
 
 func doLet(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for if")
+	}
 	var ret *Node
 	var err error
 	v, err := eval(env, node.car.car)
@@ -555,18 +561,8 @@ func doDiv(env *Env, node *Node) (*Node, error) {
 }
 
 func doEqual(env *Env, node *Node) (*Node, error) {
-	lhs, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
-	}
-
-	if node.cdr == nil {
-		return nil, errors.New("invalid arguments for equal")
-	}
-	rhs, err := eval(env, node.cdr.car)
-	if err != nil {
-		return nil, err
-	}
+	lhs := node.car
+	rhs := node.cdr.car
 
 	var f1, f2 float64
 	switch lhs.t {
@@ -595,19 +591,40 @@ func doEqual(env *Env, node *Node) (*Node, error) {
 	}, nil
 }
 
-func doLess(env *Env, node *Node) (*Node, error) {
-	lhs, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
+func doGt(env *Env, node *Node) (*Node, error) {
+	lhs := node.car
+	rhs := node.cdr.car
+
+	var f1, f2 float64
+	switch lhs.t {
+	case NodeInt:
+		f1 = float64(lhs.v.(int64))
+	case NodeDouble:
+		f1 = lhs.v.(float64)
+	}
+	switch rhs.t {
+	case NodeInt:
+		f2 = float64(rhs.v.(int64))
+	case NodeDouble:
+		f2 = rhs.v.(float64)
 	}
 
-	if node.cdr == nil {
-		return nil, errors.New("invalid arguments for less")
+	if f1 > f2 {
+		return &Node{
+			t: NodeT,
+			v: true,
+		}, nil
 	}
-	rhs, err := eval(env, node.cdr.car)
-	if err != nil {
-		return nil, err
-	}
+
+	return &Node{
+		t: NodeNil,
+		v: nil,
+	}, nil
+}
+
+func doLt(env *Env, node *Node) (*Node, error) {
+	lhs := node.car
+	rhs := node.cdr.car
 
 	var f1, f2 float64
 	switch lhs.t {
@@ -637,14 +654,15 @@ func doLess(env *Env, node *Node) (*Node, error) {
 }
 
 func doIf(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.cdr == nil {
+		return nil, errors.New("invalid arguments for if")
+	}
+
 	v, err := eval(env, node.car)
 	if err != nil {
 		return nil, err
 	}
 
-	if node.car.cdr == nil {
-		return nil, errors.New("invalid arguments for if")
-	}
 	var b bool
 	switch v.t {
 	case NodeInt:
@@ -656,65 +674,70 @@ func doIf(env *Env, node *Node) (*Node, error) {
 	}
 
 	if b {
-		v, err = eval(env, node.car.cdr.car)
-		if err != nil {
-			return nil, err
+		if node.car.cdr != nil {
+			v, err = eval(env, node.car.cdr.car)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return &Node{
+				t: NodeT,
+			}, nil
 		}
-	} else if node.cdr.cdr != nil {
-		v, err = eval(env, node.cdr.cdr.car)
-		if err != nil {
-			return nil, err
+	} else if node.cdr != nil && node.cdr.cdr != nil {
+		if node.cdr != nil && node.cdr.cdr != nil {
+			v, err = eval(env, node.cdr.cdr.car)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return &Node{
+				t: NodeNil,
+			}, nil
 		}
 	}
 	return v, nil
 }
 
 func doNot(env *Env, node *Node) (*Node, error) {
-	v, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
-	}
-
-	if node.car.cdr == nil {
+	if node.car == nil {
 		return nil, errors.New("invalid arguments for not")
 	}
+
 	var b bool
-	switch v.t {
+	switch node.car.t {
 	case NodeInt:
-		b = v.v.(int64) != 0
+		b = node.car.v.(int64) != 0
 	case NodeDouble:
-		b = v.v.(float64) != 0
+		b = node.car.v.(float64) != 0
 	case NodeT:
 		b = true
+	case NodeQuote:
+		return nil, errors.New("invalid arguments for not")
 	}
 
 	if !b {
-		v, err = eval(env, node.car.cdr.car)
-		if err != nil {
-			return nil, err
+		if node.car.cdr != nil {
+			return eval(env, node.car.cdr.car)
+		} else {
+			return &Node{
+				t: NodeT,
+			}, nil
 		}
-	} else if node.car.cdr.car != nil {
-		v, err = eval(env, node.cdr.cdr)
-		if err != nil {
-			return nil, err
+	} else {
+		if node.cdr != nil && node.cdr.cdr != nil {
+			return eval(env, node.cdr.cdr.car)
+		} else {
+			return &Node{
+				t: NodeNil,
+			}, nil
 		}
 	}
-	return v, nil
 }
 
 func doMod(env *Env, node *Node) (*Node, error) {
-	lhs, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
-	}
-
-	if node.cdr == nil {
-		return nil, errors.New("invalid arguments for mod")
-	}
-	rhs, err := eval(env, node.cdr.car)
-	if err != nil {
-		return nil, err
-	}
+	lhs := node.car
+	rhs := node.cdr.car
 
 	var i1, i2 int64
 	switch lhs.t {
@@ -737,18 +760,8 @@ func doMod(env *Env, node *Node) (*Node, error) {
 }
 
 func doAnd(env *Env, node *Node) (*Node, error) {
-	lhs, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
-	}
-
-	if node.cdr == nil {
-		return nil, errors.New("invalid arguments for and")
-	}
-	rhs, err := eval(env, node.cdr.car)
-	if err != nil {
-		return nil, err
-	}
+	lhs := node.car
+	rhs := node.cdr.car
 
 	var b1, b2 bool
 	switch lhs.t {
@@ -782,18 +795,8 @@ func doAnd(env *Env, node *Node) (*Node, error) {
 }
 
 func doOr(env *Env, node *Node) (*Node, error) {
-	lhs, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
-	}
-
-	if node.cdr == nil {
-		return nil, errors.New("invalid arguments for or")
-	}
-	rhs, err := eval(env, node.cdr.car)
-	if err != nil {
-		return nil, err
-	}
+	lhs := node.car
+	rhs := node.cdr.car
 
 	var b1, b2 bool
 	switch lhs.t {
@@ -864,19 +867,8 @@ func doCond(env *Env, node *Node) (*Node, error) {
 }
 
 func doCons(env *Env, node *Node) (*Node, error) {
-	lhs, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
-	}
-
-	if node.cdr == nil {
-		return nil, errors.New("invalid arguments for cons")
-	}
-	rhs, err := eval(env, node.cdr.car)
-	if err != nil {
-		return nil, err
-	}
-
+	lhs := node.car
+	rhs := node.cdr.car
 	return &Node{
 		t:   NodeCell,
 		car: lhs,
@@ -936,6 +928,7 @@ func doConcatenate(env *Env, node *Node) (*Node, error) {
 		return nil, errors.New("invalid arguments for concatenate")
 	}
 	var buf bytes.Buffer
+	fmt.Println(node.car)
 	curr := node.car
 	for curr != nil {
 		switch curr.car.t {
