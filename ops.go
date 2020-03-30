@@ -566,21 +566,33 @@ func doEqual(env *Env, node *Node) (*Node, error) {
 	lhs := node.car
 	rhs := node.cdr.car
 
-	var f1, f2 float64
+	var b bool
 	switch lhs.t {
 	case NodeInt:
-		f1 = float64(lhs.v.(int64))
+		f1 := lhs.v.(int64)
+		switch rhs.t {
+		case NodeInt:
+			b = f1 == rhs.v.(int64)
+		case NodeDouble:
+			b = f1 == int64(rhs.v.(float64))
+		}
 	case NodeDouble:
-		f1 = lhs.v.(float64)
-	}
-	switch rhs.t {
-	case NodeInt:
-		f2 = float64(rhs.v.(int64))
-	case NodeDouble:
-		f2 = rhs.v.(float64)
+		f1 := lhs.v.(float64)
+		switch rhs.t {
+		case NodeInt:
+			b = f1 == float64(rhs.v.(int64))
+		case NodeDouble:
+			b = f1 == rhs.v.(float64)
+		}
+	case NodeString:
+		f1 := lhs.v.(string)
+		switch rhs.t {
+		case NodeString:
+			b = f1 == rhs.v.(string)
+		}
 	}
 
-	if f1 == f2 {
+	if b {
 		return &Node{
 			t: NodeT,
 			v: true,

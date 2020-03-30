@@ -1,0 +1,6 @@
+(print (= 1 1))
+(print (= 1 2))
+(print (= 1.2 1.2))
+(print (= 1.2 1.3))
+(print (= "foo" "foo"))
+(print (= "foo" "bar"))
