@@ -64,6 +64,8 @@ func init() {
 	ops["progn"] = makeFn(false, doProgn)
 	ops["eval"] = makeFn(false, doEval)
 	ops["consp"] = makeFn(false, doConsp)
+
+	ops["load"] = makeFn(false, doLoad)
 }
 
 type Env struct {
@@ -229,6 +231,8 @@ func eval(env *Env, node *Node) (*Node, error) {
 				}
 				code = code.cdr
 			}
+		} else if node.car != nil && node.car.t == NodeNil {
+			ret = node.car
 		}
 		return ret, nil
 	case NodeQuote:
@@ -298,7 +302,7 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 	for i = int64(0); i < c; i++ {
 		vv.v = i
 		if cond != nil {
-			curr := cond
+			curr := cond.car
 			for curr != nil {
 				_, err = eval(scope, curr.car)
 				if err != nil {
@@ -321,7 +325,7 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 
 func doLet(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
-		return nil, errors.New("invalid arguments for if")
+		return nil, errors.New("invalid arguments for let")
 	}
 	var ret *Node
 	var err error
@@ -984,8 +988,11 @@ func doCond(env *Env, node *Node) (*Node, error) {
 }
 
 func doCons(env *Env, node *Node) (*Node, error) {
+	var rhs *Node
 	lhs := node.car
-	rhs := node.cdr.car
+	if node.cdr != nil {
+		rhs = node.cdr.car
+	}
 	return &Node{
 		t:   NodeCell,
 		car: lhs,
@@ -1028,7 +1035,7 @@ func doApply(env *Env, node *Node) (*Node, error) {
 		return nil, errors.New("invalid arguments for apply")
 	}
 	arg := node.cdr
-	if arg.car.t == NodeQuote {
+	if arg.car.t == NodeQuote && arg.car.car != nil {
 		arg = arg.car.car
 	}
 	v := &Node{
@@ -1199,4 +1206,21 @@ func doConsp(env *Env, node *Node) (*Node, error) {
 		}
 	}
 	return ret, nil
+}
+
+func doLoad(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.t != NodeString {
+		return nil, errors.New("invalid arguments for load")
+	}
+
+	f, err := os.Open(node.car.v.(string))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	curr, err := NewParser(f).ParseParen()
+	if err != nil {
+		return nil, err
+	}
+	return env.Eval(curr)
 }
