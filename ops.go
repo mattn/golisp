@@ -61,6 +61,9 @@ func init() {
 	ops["null"] = makeFn(false, doNull)
 	ops["list"] = makeFn(false, doList)
 	ops["make-string"] = makeFn(false, doMakeString)
+	ops["progn"] = makeFn(false, doProgn)
+	ops["eval"] = makeFn(false, doEval)
+	ops["consp"] = makeFn(false, doConsp)
 }
 
 type Env struct {
@@ -1157,4 +1160,43 @@ func doMakeString(env *Env, node *Node) (*Node, error) {
 		t: NodeString,
 		v: strings.Repeat(" ", int(node.car.v.(int64))),
 	}, nil
+}
+
+func doProgn(env *Env, node *Node) (*Node, error) {
+	ret := &Node{
+		t: NodeNil,
+	}
+	var err error
+	curr := node.cdr
+	for curr != nil {
+		ret, err = eval(env, curr.car)
+		if err != nil {
+			return nil, err
+		}
+		curr = curr.cdr
+	}
+
+	return ret, nil
+}
+
+func doEval(env *Env, node *Node) (*Node, error) {
+	return eval(env, node.car)
+}
+
+func doConsp(env *Env, node *Node) (*Node, error) {
+	var ret *Node
+	switch node.car.t {
+	case NodeQuote:
+	case NodeBquote:
+	case NodeCell:
+		ret = &Node{
+			t: NodeT,
+			v: true,
+		}
+	default:
+		ret = &Node{
+			t: NodeNil,
+		}
+	}
+	return ret, nil
 }
