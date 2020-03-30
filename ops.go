@@ -23,7 +23,7 @@ func makeFn(special bool, fn Fn) FnType {
 
 func init() {
 	ops = make(map[string]FnType)
-	ops["dotimes"] = makeFn(false, doDotimes)
+	ops["dotimes"] = makeFn(true, doDotimes)
 	ops["prin1"] = makeFn(false, doPrin1)
 	ops["print"] = makeFn(false, doPrint)
 	ops["let"] = makeFn(false, doLet)
@@ -39,12 +39,12 @@ func init() {
 	ops[">"] = makeFn(false, doGt)
 	ops[">="] = makeFn(false, doGe)
 	ops["="] = makeFn(false, doEqual)
-	ops["if"] = makeFn(false, doIf)
-	ops["not"] = makeFn(false, doNot)
+	ops["if"] = makeFn(true, doIf)
+	ops["not"] = makeFn(true, doNot)
 	ops["mod"] = makeFn(false, doMod)
 	ops["%"] = makeFn(false, doMod)
-	ops["and"] = makeFn(false, doAnd)
-	ops["or"] = makeFn(false, doOr)
+	ops["and"] = makeFn(true, doAnd)
+	ops["or"] = makeFn(true, doOr)
 	ops["cond"] = makeFn(true, doCond)
 	ops["cons"] = makeFn(false, doCons)
 	ops["car"] = makeFn(false, doCar)
@@ -779,6 +779,7 @@ func doNot(env *Env, node *Node) (*Node, error) {
 		return nil, errors.New("invalid arguments for not")
 	}
 
+	fmt.Println(node.car.t)
 	var b bool
 	switch node.car.t {
 	case NodeInt:
@@ -787,27 +788,22 @@ func doNot(env *Env, node *Node) (*Node, error) {
 		b = node.car.v.(float64) != 0
 	case NodeT:
 		b = true
+	case NodeNil:
+		b = false
+	case NodeCell:
+		b = node.car.t != NodeNil
 	case NodeQuote:
 		return nil, errors.New("invalid arguments for not")
 	}
 
 	if !b {
-		if node.car.cdr != nil {
-			return eval(env, node.car.cdr.car)
-		} else {
-			return &Node{
-				t: NodeT,
-			}, nil
-		}
-	} else {
-		if node.cdr != nil && node.cdr.cdr != nil {
-			return eval(env, node.cdr.cdr.car)
-		} else {
-			return &Node{
-				t: NodeNil,
-			}, nil
-		}
+		return &Node{
+			t: NodeT,
+		}, nil
 	}
+	return &Node{
+		t: NodeNil,
+	}, nil
 }
 
 func doMod(env *Env, node *Node) (*Node, error) {

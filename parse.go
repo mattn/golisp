@@ -277,7 +277,6 @@ func (n *Node) String() string {
 	case NodeCell:
 		curr := n
 		fmt.Fprint(&buf, "(")
-		//if curr.car != nil || curr.cdr != nil {
 		for curr != nil {
 			if curr.car != nil {
 				fmt.Fprint(&buf, curr.car)
@@ -295,7 +294,6 @@ func (n *Node) String() string {
 			fmt.Fprint(&buf, " ")
 			curr = curr.cdr
 		}
-		//}
 		fmt.Fprint(&buf, ")")
 	case NodeNil:
 		fmt.Fprint(&buf, "nil")
