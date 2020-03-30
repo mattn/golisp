@@ -779,7 +779,6 @@ func doNot(env *Env, node *Node) (*Node, error) {
 		return nil, errors.New("invalid arguments for not")
 	}
 
-	fmt.Println(node.car.t)
 	var b bool
 	switch node.car.t {
 	case NodeInt:
@@ -908,9 +907,9 @@ func doCond(env *Env, node *Node) (*Node, error) {
 	if node == nil {
 		return ret, nil
 	}
-	curr := node.car
-	for curr != nil && curr.car != nil {
-		ret, err = eval(env, curr.car)
+	curr := node
+	for curr != nil && curr.car != nil && curr.car.t != NodeNil {
+		ret, err = eval(env, curr.car.car)
 		if err != nil {
 			return nil, err
 		}
@@ -924,10 +923,19 @@ func doCond(env *Env, node *Node) (*Node, error) {
 			b = true
 		}
 		if b {
-			if curr.cdr != nil {
-				ret, err = eval(env, curr.cdr.car)
-				if err != nil {
-					return nil, err
+			if curr.car.cdr != nil {
+				curr = curr.car.cdr
+				for curr != nil {
+					ret, err = eval(env, curr.car)
+					if err != nil {
+						return nil, err
+					}
+					curr = curr.cdr
+				}
+			} else {
+				ret = &Node{
+					t: NodeT,
+					v: true,
 				}
 			}
 			break
