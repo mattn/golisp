@@ -1,0 +1,15 @@
+(defun xxx (a b) (+ a b))
+(print (xxx 3 4))
+(defun x (x y) (+ x y))
+(print (x 10 20))
+(defun x (x y) (- x y))
+(print (x 10 20))
+
+(defun x nil)
+(print (x))
+
+(defun x (x) (defun y (y) (print (* x y))) (print x) (y x))
+(x 10)
+(y 20)
+(x 30)
+(y 40)
