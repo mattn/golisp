@@ -149,6 +149,29 @@ func (p *Parser) ParseString() (*Node, error) {
 			return nil, err
 		}
 
+		if r == '\\' {
+			r, err = p.readRune()
+			if err != nil {
+				return nil, err
+			}
+			switch r {
+			case '\\':
+				r = '\\'
+			case 'n':
+				r = '\n'
+			case 'r':
+				r = '\r'
+			case 't':
+				r = '\t'
+			case 'b':
+				r = '\b'
+			case 'f':
+				r = '\f'
+			case '"':
+				buf.WriteRune(r)
+				continue
+			}
+		}
 		if r == '"' {
 			break
 		}

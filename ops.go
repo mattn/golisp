@@ -27,7 +27,7 @@ func init() {
 	ops["dotimes"] = makeFn(true, doDotimes)
 	ops["prin1"] = makeFn(false, doPrin1)
 	ops["print"] = makeFn(false, doPrint)
-	ops["let"] = makeFn(false, doLet)
+	ops["let"] = makeFn(true, doLet)
 	ops["setq"] = makeFn(true, doSetq)
 	ops["1+"] = makeFn(false, doPlusOne)
 	ops["1-"] = makeFn(false, doMinusOne)
@@ -302,7 +302,7 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 	for i = int64(0); i < c; i++ {
 		vv.v = i
 		if cond != nil {
-			curr := cond.car
+			curr := cond
 			for curr != nil {
 				_, err = eval(scope, curr.car)
 				if err != nil {
@@ -327,19 +327,21 @@ func doLet(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
 		return nil, errors.New("invalid arguments for let")
 	}
+	scope := NewEnv(env)
+
 	var ret *Node
 	var err error
-	v, err := eval(env, node.car.car)
-	if err != nil {
-		return nil, err
+	curr := node.car
+	for curr != nil {
+		vv, err := eval(env, curr.car.cdr.car)
+		if err != nil {
+			return nil, err
+		}
+		scope.vars[curr.car.car.v.(string)] = vv
+		curr = curr.cdr
 	}
-	vv, err := eval(env, node.cdr)
-	if err != nil {
-		return nil, err
-	}
-	scope := NewEnv(env)
-	scope.vars[v.v.(string)] = vv
-	curr := node.cdr
+
+	curr = node.cdr
 	for curr != nil {
 		ret, err = eval(scope, curr.car)
 		if err != nil {
@@ -775,7 +777,7 @@ func doIf(env *Env, node *Node) (*Node, error) {
 
 	if b {
 		if node.car.cdr != nil {
-			v, err = eval(env, node.car.cdr.car)
+			v, err = eval(env, node.cdr.car)
 			if err != nil {
 				return nil, err
 			}
