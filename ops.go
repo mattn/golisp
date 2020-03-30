@@ -54,7 +54,7 @@ func init() {
 	ops["apply"] = makeFn(false, doApply)
 	ops["concatenate"] = makeFn(false, doConcatenate)
 	ops["defun"] = makeFn(true, doDefun)
-	ops["quote"] = makeFn(false, doQuote)
+	ops["quote"] = makeFn(true, doQuote)
 	ops["getenv"] = makeFn(false, doGetenv)
 	ops["length"] = makeFn(false, doLength)
 	ops["null"] = makeFn(false, doNull)
@@ -1064,10 +1064,7 @@ func doDefun(env *Env, node *Node) (*Node, error) {
 }
 
 func doQuote(env *Env, node *Node) (*Node, error) {
-	return &Node{
-		t: NodeQuote,
-		v: node,
-	}, nil
+	return node.car, nil
 }
 
 func doGetenv(env *Env, node *Node) (*Node, error) {
