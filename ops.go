@@ -273,7 +273,11 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 		return nil, errors.New("invalid arguments for dotimes")
 	}
 	v := node.car.car.v.(string)
-	c := node.car.cdr.car.v.(int64)
+	count, err := eval(env, node.car.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+	c := count.v.(int64)
 
 	scope := NewEnv(env)
 	vv := &Node{
@@ -283,11 +287,12 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 	}
 	scope.vars[v] = vv
 
-	node = node.cdr
-	for i := int64(0); i < c; i++ {
+	cond := node.cdr
+	var i int64
+	for i = int64(0); i < c; i++ {
 		vv.v = i
-		if node != nil {
-			curr := node
+		if cond != nil {
+			curr := cond
 			for curr != nil {
 				_, err = eval(scope, curr.car)
 				if err != nil {
@@ -297,6 +302,12 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 			}
 		}
 	}
+	vv.v = i
+
+	if node.car.cdr.cdr != nil {
+		return eval(scope, node.car.cdr.cdr.car)
+	}
+
 	return &Node{
 		t: NodeNil,
 	}, nil
@@ -333,8 +344,12 @@ func doSetq(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.car.t != NodeIdent {
 		return nil, errors.New("invalid arguments for setq")
 	}
-	env.vars[node.car.v.(string)] = node.cdr.car
-	return node.cdr.car, nil
+	ret, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+	env.vars[node.car.v.(string)] = ret
+	return ret, nil
 }
 
 func doPlusOne(env *Env, node *Node) (*Node, error) {
