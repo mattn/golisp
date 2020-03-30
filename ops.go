@@ -35,7 +35,9 @@ func init() {
 	ops["*"] = makeFn(false, doMul)
 	ops["/"] = makeFn(false, doDiv)
 	ops["<"] = makeFn(false, doLt)
+	ops["<="] = makeFn(false, doLe)
 	ops[">"] = makeFn(false, doGt)
+	ops[">="] = makeFn(false, doGe)
 	ops["="] = makeFn(false, doEqual)
 	ops["if"] = makeFn(false, doIf)
 	ops["not"] = makeFn(false, doNot)
@@ -622,6 +624,37 @@ func doGt(env *Env, node *Node) (*Node, error) {
 	}, nil
 }
 
+func doGe(env *Env, node *Node) (*Node, error) {
+	lhs := node.car
+	rhs := node.cdr.car
+
+	var f1, f2 float64
+	switch lhs.t {
+	case NodeInt:
+		f1 = float64(lhs.v.(int64))
+	case NodeDouble:
+		f1 = lhs.v.(float64)
+	}
+	switch rhs.t {
+	case NodeInt:
+		f2 = float64(rhs.v.(int64))
+	case NodeDouble:
+		f2 = rhs.v.(float64)
+	}
+
+	if f1 >= f2 {
+		return &Node{
+			t: NodeT,
+			v: true,
+		}, nil
+	}
+
+	return &Node{
+		t: NodeNil,
+		v: nil,
+	}, nil
+}
+
 func doLt(env *Env, node *Node) (*Node, error) {
 	lhs := node.car
 	rhs := node.cdr.car
@@ -653,6 +686,36 @@ func doLt(env *Env, node *Node) (*Node, error) {
 	}, nil
 }
 
+func doLe(env *Env, node *Node) (*Node, error) {
+	lhs := node.car
+	rhs := node.cdr.car
+
+	var f1, f2 float64
+	switch lhs.t {
+	case NodeInt:
+		f1 = float64(lhs.v.(int64))
+	case NodeDouble:
+		f1 = lhs.v.(float64)
+	}
+	switch rhs.t {
+	case NodeInt:
+		f2 = float64(rhs.v.(int64))
+	case NodeDouble:
+		f2 = rhs.v.(float64)
+	}
+
+	if f1 <= f2 {
+		return &Node{
+			t: NodeT,
+			v: true,
+		}, nil
+	}
+
+	return &Node{
+		t: NodeNil,
+		v: nil,
+	}, nil
+}
 func doIf(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.car.cdr == nil {
 		return nil, errors.New("invalid arguments for if")
@@ -892,9 +955,15 @@ func doCar(env *Env, node *Node) (*Node, error) {
 }
 
 func doCdr(env *Env, node *Node) (*Node, error) {
-	if node.car == nil || node.car.cdr == nil {
+	if node.car == nil {
 		return &Node{
 			t: NodeNil,
+		}, nil
+	}
+	if node.car.t == NodeQuote {
+		return &Node{
+			t:   NodeCell,
+			car: node.car.car.cdr,
 		}, nil
 	}
 	return node.car.cdr, nil
@@ -990,7 +1059,11 @@ func doLength(env *Env, node *Node) (*Node, error) {
 		l = int64(len(node.car.v.(string)))
 	case NodeCell:
 		curr := node.car
-		for curr != nil {
+		if curr.t == NodeNil {
+			break
+		}
+		l++
+		for curr.cdr != nil && curr.cdr.t != NodeNil {
 			l++
 			curr = curr.cdr
 		}
