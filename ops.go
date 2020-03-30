@@ -58,6 +58,7 @@ func init() {
 	ops["getenv"] = makeFn(false, doGetenv)
 	ops["length"] = makeFn(false, doLength)
 	ops["null"] = makeFn(false, doNull)
+	ops["list"] = makeFn(false, doList)
 }
 
 type Env struct {
@@ -794,18 +795,23 @@ func doNot(env *Env, node *Node) (*Node, error) {
 		return nil, errors.New("invalid arguments for not")
 	}
 
+	vv, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+
 	var b bool
-	switch node.car.t {
+	switch vv.t {
 	case NodeInt:
-		b = node.car.v.(int64) != 0
+		b = vv.v.(int64) != 0
 	case NodeDouble:
-		b = node.car.v.(float64) != 0
+		b = vv.v.(float64) != 0
 	case NodeT:
 		b = true
 	case NodeNil:
 		b = false
 	case NodeCell:
-		b = node.car.t != NodeNil
+		b = vv.t != NodeNil
 	case NodeQuote:
 		return nil, errors.New("invalid arguments for not")
 	}
@@ -1115,6 +1121,14 @@ func doLength(env *Env, node *Node) (*Node, error) {
 	}, nil
 }
 
+func doList(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return &Node{
+			t: NodeNil,
+		}, nil
+	}
+	return node.car, nil
+}
 func doNull(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
 		return nil, errors.New("invalid arguments for length")
