@@ -385,7 +385,7 @@ func doPlusOne(env *Env, node *Node) (*Node, error) {
 }
 
 func doPlus(env *Env, node *Node) (*Node, error) {
-	if node.car == nil {
+	if node.car == nil || node.car.t == NodeNil {
 		return &Node{
 			t: NodeInt,
 			v: int64(0),
@@ -400,7 +400,7 @@ func doPlus(env *Env, node *Node) (*Node, error) {
 		v: node.car.v,
 	}
 	curr := node.cdr
-	for curr != nil {
+	for curr != nil && curr.car != nil {
 		switch ret.t {
 		case NodeInt:
 			switch curr.car.t {
@@ -409,6 +409,7 @@ func doPlus(env *Env, node *Node) (*Node, error) {
 			case NodeDouble:
 				ret.v = float64(ret.v.(int64)) + curr.car.v.(float64)
 				ret.t = NodeDouble
+			case NodeNil:
 			default:
 				return nil, errors.New("invalid arguments for +")
 			}
@@ -418,6 +419,7 @@ func doPlus(env *Env, node *Node) (*Node, error) {
 				ret.v = ret.v.(float64) + float64(curr.car.v.(int64))
 			case NodeDouble:
 				ret.v = ret.v.(float64) + curr.car.v.(float64)
+			case NodeNil:
 			default:
 				return nil, errors.New("invalid arguments for +")
 			}
@@ -1039,10 +1041,12 @@ func doApply(env *Env, node *Node) (*Node, error) {
 	arg := node.cdr
 	if arg.car.t == NodeQuote && arg.car.car != nil {
 		arg = arg.car.car
+	} else if arg.car.t == NodeCell {
+		arg = arg.car
 	}
 	v := &Node{
 		t:   NodeCell,
-		car: node.car.car,
+		car: node.car,
 		cdr: arg,
 	}
 	return eval(env, v)
