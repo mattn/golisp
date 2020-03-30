@@ -99,6 +99,15 @@ func eval(env *Env, node *Node) (*Node, error) {
 		}
 
 		e := env
+		for e != nil {
+			v, ok := e.vars[name]
+			if ok {
+				return v, nil
+			}
+			e = e.env
+		}
+
+		e = env
 		for e.env != nil {
 			e = e.env
 		}
@@ -107,14 +116,6 @@ func eval(env *Env, node *Node) (*Node, error) {
 			return v, nil
 		}
 
-		e = env
-		for e != nil {
-			v, ok := e.vars[name]
-			if ok {
-				return v, nil
-			}
-			e = e.env
-		}
 		return nil, fmt.Errorf("undefined symbol: %v", node.v)
 	case NodeCell:
 		if node.car == nil {
@@ -128,7 +129,25 @@ func eval(env *Env, node *Node) (*Node, error) {
 			name := node.car.v.(string)
 			ft, ok := ops[name]
 			if !ok {
-				return nil, fmt.Errorf("invalid op: %v", name)
+				e := env
+				var fn *Node
+				var ok bool
+				for e != nil {
+					fn, ok = e.fncs[name]
+					if ok {
+						break
+					}
+					e = e.env
+				}
+				if fn == nil {
+					return nil, fmt.Errorf("invalid op: %v", name)
+				}
+				ev := &Node{
+					t:   NodeCell,
+					car: fn,
+					cdr: node.cdr,
+				}
+				return eval(env, ev)
 			}
 
 			if ft.special {
@@ -169,7 +188,7 @@ func eval(env *Env, node *Node) (*Node, error) {
 				}
 			}
 		} else if node.car != nil && node.car.t == NodeEnv {
-			scope := NewEnv(env)
+			scope := NewEnv(node.car.e)
 			var code *Node
 			if node.car.cdr.car != nil {
 				arg := node.car.cdr.car
@@ -184,17 +203,20 @@ func eval(env *Env, node *Node) (*Node, error) {
 					val = val.cdr
 				}
 				if node.car.cdr.cdr != nil && node.car.cdr.cdr.car != nil {
-					code = node.car.cdr.cdr.car
+					code = node.car.cdr.cdr
 				} else {
-					code = node.car.cdr.car
+					code = node.car.cdr
 				}
 			} else {
-				code = node.car.cdr.car
+				code = node.car.cdr
 			}
 
-			ret, err = eval(scope, code)
-			if err != nil {
-				return nil, err
+			for code != nil && code.car != nil {
+				ret, err = eval(scope, code.car)
+				if err != nil {
+					return nil, err
+				}
+				code = code.cdr
 			}
 		}
 		return ret, nil
@@ -910,8 +932,11 @@ func doAref(env *Env, node *Node) (*Node, error) {
 }
 
 func doConcatenate(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.t != NodeQuote {
+		return nil, errors.New("invalid arguments for concatenate")
+	}
 	var buf bytes.Buffer
-	curr := node
+	curr := node.car
 	for curr != nil {
 		switch curr.car.t {
 		case NodeString:
