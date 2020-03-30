@@ -1036,12 +1036,11 @@ func doAref(env *Env, node *Node) (*Node, error) {
 }
 
 func doConcatenate(env *Env, node *Node) (*Node, error) {
-	if node.car == nil || node.car.t != NodeQuote {
+	if node.car == nil || node.car.t != NodeIdent {
 		return nil, errors.New("invalid arguments for concatenate")
 	}
 	var buf bytes.Buffer
-	fmt.Println(node.car)
-	curr := node.car
+	curr := node.cdr
 	for curr != nil {
 		switch curr.car.t {
 		case NodeString:
