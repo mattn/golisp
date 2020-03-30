@@ -66,6 +66,7 @@ func init() {
 	ops["consp"] = makeFn(false, doConsp)
 
 	ops["load"] = makeFn(false, doLoad)
+	ops["funcall"] = makeFn(false, doFuncall)
 }
 
 type Env struct {
@@ -1229,4 +1230,18 @@ func doLoad(env *Env, node *Node) (*Node, error) {
 		return nil, err
 	}
 	return env.Eval(curr)
+}
+
+func doFuncall(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for funcall")
+	}
+	//fmt.Println(node.car)
+	//fmt.Println(node.cdr)
+	v := &Node{
+		t:   NodeCell,
+		car: node.car,
+		cdr: node.cdr,
+	}
+	return eval(env, v)
 }
