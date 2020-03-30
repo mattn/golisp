@@ -45,7 +45,7 @@ func init() {
 	ops["%"] = makeFn(false, doMod)
 	ops["and"] = makeFn(false, doAnd)
 	ops["or"] = makeFn(false, doOr)
-	ops["cond"] = makeFn(false, doCond)
+	ops["cond"] = makeFn(true, doCond)
 	ops["cons"] = makeFn(false, doCons)
 	ops["car"] = makeFn(false, doCar)
 	ops["cdr"] = makeFn(false, doCdr)
@@ -841,19 +841,18 @@ func doAnd(env *Env, node *Node) (*Node, error) {
 	case NodeDouble:
 		b2 = rhs.v.(float64) != 0
 	case NodeT:
-		b1 = true
+		b2 = true
 	}
 
 	if b1 && b2 {
 		return &Node{
-			t: NodeNil,
-			v: nil,
+			t: NodeT,
+			v: true,
 		}, nil
 	}
 
 	return &Node{
 		t: NodeNil,
-		v: nil,
 	}, nil
 }
 
@@ -876,19 +875,18 @@ func doOr(env *Env, node *Node) (*Node, error) {
 	case NodeDouble:
 		b2 = rhs.v.(float64) != 0
 	case NodeT:
-		b1 = true
+		b2 = true
 	}
 
 	if b1 || b2 {
 		return &Node{
-			t: NodeNil,
-			v: nil,
+			t: NodeT,
+			v: true,
 		}, nil
 	}
 
 	return &Node{
 		t: NodeNil,
-		v: nil,
 	}, nil
 }
 
@@ -899,12 +897,12 @@ func doCond(env *Env, node *Node) (*Node, error) {
 	ret = &Node{
 		t: NodeNil,
 	}
-	curr := node
-	for curr != nil {
-		if curr.car == nil || curr.car.cdr == nil {
-			return nil, errors.New("invalid arguments for cond")
-		}
-		ret, err = eval(env, curr.car.car)
+	if node == nil {
+		return ret, nil
+	}
+	curr := node.car
+	for curr != nil && curr.car != nil {
+		ret, err = eval(env, curr.car)
 		if err != nil {
 			return nil, err
 		}
@@ -918,9 +916,11 @@ func doCond(env *Env, node *Node) (*Node, error) {
 			b = true
 		}
 		if b {
-			ret, err = eval(env, curr.car.cdr.car)
-			if err != nil {
-				return nil, err
+			if curr.cdr != nil {
+				ret, err = eval(env, curr.cdr.car)
+				if err != nil {
+					return nil, err
+				}
 			}
 			break
 		}
