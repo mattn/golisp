@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 type Fn func(*Env, *Node) (*Node, error)
@@ -59,6 +60,7 @@ func init() {
 	ops["length"] = makeFn(false, doLength)
 	ops["null"] = makeFn(false, doNull)
 	ops["list"] = makeFn(false, doList)
+	ops["make-string"] = makeFn(false, doMakeString)
 }
 
 type Env struct {
@@ -1129,6 +1131,7 @@ func doList(env *Env, node *Node) (*Node, error) {
 	}
 	return node.car, nil
 }
+
 func doNull(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
 		return nil, errors.New("invalid arguments for length")
@@ -1142,5 +1145,16 @@ func doNull(env *Env, node *Node) (*Node, error) {
 
 	return &Node{
 		t: NodeNil,
+	}, nil
+}
+
+func doMakeString(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.t != NodeInt {
+		return nil, errors.New("invalid arguments for make-string")
+	}
+
+	return &Node{
+		t: NodeString,
+		v: strings.Repeat(" ", int(node.car.v.(int64))),
 	}, nil
 }
