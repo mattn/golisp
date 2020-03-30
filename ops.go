@@ -845,8 +845,14 @@ func doMod(env *Env, node *Node) (*Node, error) {
 }
 
 func doAnd(env *Env, node *Node) (*Node, error) {
-	lhs := node.car
-	rhs := node.cdr.car
+	lhs, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+	rhs, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
 
 	var b1, b2 bool
 	switch lhs.t {
@@ -879,8 +885,14 @@ func doAnd(env *Env, node *Node) (*Node, error) {
 }
 
 func doOr(env *Env, node *Node) (*Node, error) {
-	lhs := node.car
-	rhs := node.cdr.car
+	lhs, err := eval(env, node.car)
+	if err != nil {
+		return nil, err
+	}
+	rhs, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
 
 	var b1, b2 bool
 	switch lhs.t {
