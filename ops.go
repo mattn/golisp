@@ -9,64 +9,72 @@ import (
 	"strings"
 )
 
+type Ft int
+
+const (
+	FtSpecial Ft = iota
+	FtBuiltin
+)
+
 type Fn func(*Env, *Node) (*Node, error)
 
-type FnType struct {
-	special bool
-	fn      Fn
+type FnInfo struct {
+	ft Ft
+	fn Fn
 }
 
-var ops map[string]FnType
+var ops map[string]FnInfo
 
-func makeFn(special bool, fn Fn) FnType {
-	return FnType{special: special, fn: fn}
+func makeFn(ft Ft, fn Fn) FnInfo {
+	return FnInfo{ft: ft, fn: fn}
 }
 
 func init() {
-	ops = make(map[string]FnType)
-	ops["dotimes"] = makeFn(true, doDotimes)
-	ops["prin1"] = makeFn(false, doPrin1)
-	ops["print"] = makeFn(false, doPrint)
-	ops["let"] = makeFn(true, doLet)
-	ops["setq"] = makeFn(true, doSetq)
-	ops["1+"] = makeFn(false, doPlusOne)
-	ops["1-"] = makeFn(false, doMinusOne)
-	ops["+"] = makeFn(false, doPlus)
-	ops["-"] = makeFn(false, doMinus)
-	ops["*"] = makeFn(false, doMul)
-	ops["/"] = makeFn(false, doDiv)
-	ops["<"] = makeFn(false, doLt)
-	ops["<="] = makeFn(false, doLe)
-	ops[">"] = makeFn(false, doGt)
-	ops[">="] = makeFn(false, doGe)
-	ops["="] = makeFn(false, doEqual)
-	ops["if"] = makeFn(true, doIf)
-	ops["not"] = makeFn(true, doNot)
-	ops["mod"] = makeFn(false, doMod)
-	ops["%"] = makeFn(false, doMod)
-	ops["and"] = makeFn(true, doAnd)
-	ops["or"] = makeFn(true, doOr)
-	ops["cond"] = makeFn(true, doCond)
-	ops["cons"] = makeFn(false, doCons)
-	ops["car"] = makeFn(false, doCar)
-	ops["cdr"] = makeFn(false, doCdr)
-	ops["first"] = makeFn(false, doCar)
-	ops["rest"] = makeFn(false, doCdr)
-	ops["apply"] = makeFn(false, doApply)
-	ops["concatenate"] = makeFn(false, doConcatenate)
-	ops["defun"] = makeFn(true, doDefun)
-	ops["quote"] = makeFn(true, doQuote)
-	ops["getenv"] = makeFn(false, doGetenv)
-	ops["length"] = makeFn(false, doLength)
-	ops["null"] = makeFn(false, doNull)
-	ops["list"] = makeFn(false, doList)
-	ops["make-string"] = makeFn(false, doMakeString)
-	ops["progn"] = makeFn(false, doProgn)
-	ops["eval"] = makeFn(false, doEval)
-	ops["consp"] = makeFn(false, doConsp)
+	ops = make(map[string]FnInfo)
+	ops["dotimes"] = makeFn(FtSpecial, doDotimes)
+	ops["prin1"] = makeFn(FtBuiltin, doPrin1)
+	ops["print"] = makeFn(FtBuiltin, doPrint)
+	ops["let"] = makeFn(FtSpecial, doLet)
+	ops["setq"] = makeFn(FtSpecial, doSetq)
+	ops["1+"] = makeFn(FtBuiltin, doPlusOne)
+	ops["1-"] = makeFn(FtBuiltin, doMinusOne)
+	ops["+"] = makeFn(FtBuiltin, doPlus)
+	ops["-"] = makeFn(FtBuiltin, doMinus)
+	ops["*"] = makeFn(FtBuiltin, doMul)
+	ops["/"] = makeFn(FtBuiltin, doDiv)
+	ops["<"] = makeFn(FtBuiltin, doLt)
+	ops["<="] = makeFn(FtBuiltin, doLe)
+	ops[">"] = makeFn(FtBuiltin, doGt)
+	ops[">="] = makeFn(FtBuiltin, doGe)
+	ops["="] = makeFn(FtBuiltin, doEqual)
+	ops["if"] = makeFn(FtSpecial, doIf)
+	ops["not"] = makeFn(FtSpecial, doNot)
+	ops["mod"] = makeFn(FtBuiltin, doMod)
+	ops["%"] = makeFn(FtBuiltin, doMod)
+	ops["and"] = makeFn(FtSpecial, doAnd)
+	ops["or"] = makeFn(FtSpecial, doOr)
+	ops["cond"] = makeFn(FtSpecial, doCond)
+	ops["cons"] = makeFn(FtBuiltin, doCons)
+	ops["car"] = makeFn(FtBuiltin, doCar)
+	ops["cdr"] = makeFn(FtBuiltin, doCdr)
+	ops["first"] = makeFn(FtBuiltin, doCar)
+	ops["rest"] = makeFn(FtBuiltin, doCdr)
+	ops["apply"] = makeFn(FtBuiltin, doApply)
+	ops["concatenate"] = makeFn(FtBuiltin, doConcatenate)
+	ops["defun"] = makeFn(FtSpecial, doDefun)
+	ops["quote"] = makeFn(FtSpecial, doQuote)
+	ops["getenv"] = makeFn(FtBuiltin, doGetenv)
+	ops["length"] = makeFn(FtBuiltin, doLength)
+	ops["null"] = makeFn(FtBuiltin, doNull)
+	ops["list"] = makeFn(FtBuiltin, doList)
+	ops["make-string"] = makeFn(FtBuiltin, doMakeString)
+	ops["progn"] = makeFn(FtBuiltin, doProgn)
+	ops["eval"] = makeFn(FtBuiltin, doEval)
+	ops["consp"] = makeFn(FtBuiltin, doConsp)
 
-	ops["load"] = makeFn(false, doLoad)
-	ops["funcall"] = makeFn(false, doFuncall)
+	ops["load"] = makeFn(FtBuiltin, doLoad)
+	ops["funcall"] = makeFn(FtBuiltin, doFuncall)
+	//ops["lambda"] = makeFn(FtBuiltin, doLambda)
 }
 
 type Env struct {
@@ -164,22 +172,13 @@ func eval(env *Env, node *Node) (*Node, error) {
 				return eval(env, ev)
 			}
 
-			if ft.special {
+			if ft.ft == FtSpecial {
 				ret, err = ft.fn(env, node.cdr)
 				if err != nil {
 					return nil, err
 				}
 			} else {
-				head := &Node{
-					t: NodeCell,
-					car: &Node{
-						t: NodeNil,
-					},
-					cdr: &Node{
-						t: NodeNil,
-					},
-				}
-				arg := head
+				var head, prev *Node
 				if node.cdr != nil {
 					curr := node.cdr
 					for curr != nil && curr.car != nil {
@@ -187,16 +186,32 @@ func eval(env *Env, node *Node) (*Node, error) {
 						if err != nil {
 							return nil, err
 						}
-						arg.cdr = &Node{
-							t:   NodeCell,
-							car: vv,
+						if vv == nil {
+							vv = &Node{
+								t: NodeNil,
+							}
 						}
-						arg = arg.cdr
+						newv := *vv
+						vvv := &Node{
+							t:   NodeCell,
+							car: &newv,
+						}
+						if prev != nil {
+							prev.cdr = vvv
+						} else {
+							head = vvv
+						}
+						prev = vvv
 						curr = curr.cdr
 					}
 				}
 				newenv := NewEnv(env)
-				ret, err = ft.fn(newenv, head.cdr)
+				if head == nil {
+					head = &Node{
+						t: NodeNil,
+					}
+				}
+				ret, err = ft.fn(newenv, head)
 				if err != nil {
 					return nil, err
 				}
@@ -361,7 +376,18 @@ func doSetq(env *Env, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	env.vars[node.car.v.(string)] = ret
+
+	name := node.car.v.(string)
+	e := env
+	for e != nil {
+		_, ok := e.vars[name]
+		if ok {
+			e.vars[name] = ret
+			return ret, nil
+		}
+		e = e.env
+	}
+	env.vars[name] = ret
 	return ret, nil
 }
 
@@ -1233,6 +1259,20 @@ func doLoad(env *Env, node *Node) (*Node, error) {
 }
 
 func doFuncall(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for funcall")
+	}
+	//fmt.Println(node.car)
+	//fmt.Println(node.cdr)
+	v := &Node{
+		t:   NodeCell,
+		car: node.car,
+		cdr: node.cdr,
+	}
+	return eval(env, v)
+}
+
+func doLambda(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
 		return nil, errors.New("invalid arguments for funcall")
 	}
