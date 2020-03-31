@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -34,12 +35,33 @@ func repl() {
 }
 
 func main() {
-	if isatty.IsTerminal(os.Stdin.Fd()) {
-		repl()
-		return
+	flag.Parse()
+
+	if flag.NArg() > 1 {
+		flag.Usage()
+		os.Exit(2)
 	}
 
-	parser := golisp.NewParser(os.Stdin)
+	var f *os.File
+	var err error
+
+	if flag.NArg() == 0 {
+		if isatty.IsTerminal(os.Stdin.Fd()) {
+			repl()
+			return
+		}
+		f = os.Stdin
+	}
+
+	if flag.NArg() == 1 {
+		f, err = os.Open(flag.Arg(0))
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+	}
+
+	parser := golisp.NewParser(f)
 	node, err := parser.ParseParen()
 	if err != nil {
 		log.Fatal(err)
