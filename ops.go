@@ -1079,7 +1079,7 @@ func doCar(env *Env, node *Node) (*Node, error) {
 			v: "quote",
 		}, nil
 	}
-	if curr.t == NodeCell && curr.t != NodeNil {
+	if curr.t != NodeCell && curr.t != NodeNil {
 		return nil, fmt.Errorf("arguments should be list: %v", curr)
 	}
 
