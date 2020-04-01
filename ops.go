@@ -48,7 +48,7 @@ func init() {
 	ops[">="] = makeFn(FtBuiltin, doGe)
 	ops["="] = makeFn(FtBuiltin, doEqual)
 	ops["if"] = makeFn(FtSpecial, doIf)
-	ops["not"] = makeFn(FtSpecial, doNot)
+	ops["not"] = makeFn(FtBuiltin, doNot)
 	ops["mod"] = makeFn(FtBuiltin, doMod)
 	ops["%"] = makeFn(FtBuiltin, doMod)
 	ops["and"] = makeFn(FtSpecial, doAnd)
@@ -831,34 +831,10 @@ func doIf(env *Env, node *Node) (*Node, error) {
 }
 
 func doNot(env *Env, node *Node) (*Node, error) {
-	if node.car == nil {
-		return nil, errors.New("invalid arguments for not")
-	}
-
-	vv, err := eval(env, node.car)
-	if err != nil {
-		return nil, err
-	}
-
-	var b bool
-	switch vv.t {
-	case NodeInt:
-		b = vv.v.(int64) != 0
-	case NodeDouble:
-		b = vv.v.(float64) != 0
-	case NodeT:
-		b = true
-	case NodeNil:
-		b = false
-	case NodeCell:
-		b = vv.t != NodeNil
-	case NodeQuote:
-		return nil, errors.New("invalid arguments for not")
-	}
-
-	if !b {
+	if node.car == nil || node.car.t == NodeNil {
 		return &Node{
 			t: NodeT,
+			v: true,
 		}, nil
 	}
 	return &Node{
