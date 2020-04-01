@@ -194,7 +194,7 @@ func call(env *Env, node *Node) (*Node, error) {
 	}
 
 	if node.car == nil || node.car.t != NodeEnv {
-		return nil, fmt.Errorf("illegal function call: %v", node)
+		return node, nil
 	}
 
 	scope := NewEnv(node.car.e)
@@ -1329,21 +1329,18 @@ func doEval(env *Env, node *Node) (*Node, error) {
 }
 
 func doConsp(env *Env, node *Node) (*Node, error) {
-	var ret *Node
 	switch node.car.t {
 	case NodeQuote:
 	case NodeBquote:
 	case NodeCell:
-		ret = &Node{
+		return &Node{
 			t: NodeT,
 			v: true,
-		}
-	default:
-		ret = &Node{
-			t: NodeNil,
-		}
+		}, nil
 	}
-	return ret, nil
+	return &Node{
+		t: NodeNil,
+	}, nil
 }
 
 func doLoad(env *Env, node *Node) (*Node, error) {
