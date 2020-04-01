@@ -35,6 +35,7 @@ func init() {
 	ops["prin1"] = makeFn(FtBuiltin, doPrin1)
 	ops["print"] = makeFn(FtBuiltin, doPrint)
 	ops["let"] = makeFn(FtSpecial, doLet)
+	ops["let*"] = makeFn(FtSpecial, doLetStar)
 	ops["setq"] = makeFn(FtSpecial, doSetq)
 	ops["1+"] = makeFn(FtBuiltin, doPlusOne)
 	ops["1-"] = makeFn(FtBuiltin, doMinusOne)
@@ -353,6 +354,46 @@ func doLet(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
 		return nil, errors.New("invalid arguments for let")
 	}
+	if node.car.t == NodeNil {
+		return &Node{
+			t: NodeNil,
+		}, nil
+	}
+	scope := NewEnv(env)
+
+	var ret, vv *Node
+	var err error
+	curr := node.car
+	for curr != nil {
+		if curr.car.cdr == nil {
+			scope.vars[curr.car.v.(string)] = &Node{
+				t: NodeNil,
+			}
+		} else {
+			vv, err = eval(env, curr.car.cdr.car)
+			if err != nil {
+				return nil, err
+			}
+			scope.vars[curr.car.car.v.(string)] = vv
+		}
+		curr = curr.cdr
+	}
+
+	curr = node.cdr
+	for curr != nil {
+		ret, err = eval(scope, curr.car)
+		if err != nil {
+			return nil, err
+		}
+		curr = curr.cdr
+	}
+	return ret, nil
+}
+
+func doLetStar(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for let*")
+	}
 	scope := NewEnv(env)
 
 	var ret *Node
@@ -369,6 +410,7 @@ func doLet(env *Env, node *Node) (*Node, error) {
 
 	curr = node.cdr
 	for curr != nil {
+		scope = NewEnv(scope)
 		ret, err = eval(scope, curr.car)
 		if err != nil {
 			return nil, err
