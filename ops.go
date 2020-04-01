@@ -58,7 +58,8 @@ func init() {
 	ops["cons"] = makeFn(FtBuiltin, doCons)
 	ops["car"] = makeFn(FtBuiltin, doCar)
 	ops["cdr"] = makeFn(FtBuiltin, doCdr)
-	ops["first"] = makeFn(FtBuiltin, doCar)
+	ops["first"] = makeFn(FtBuiltin, doFirst)
+	ops["second"] = makeFn(FtBuiltin, doSecond)
 	ops["rest"] = makeFn(FtBuiltin, doCdr)
 	ops["apply"] = makeFn(FtBuiltin, doApply)
 	ops["concatenate"] = makeFn(FtBuiltin, doConcatenate)
@@ -121,6 +122,116 @@ func (e *Env) Eval(node *Node) (*Node, error) {
 	return ret, nil
 }
 
+func eval_list(env *Env, node *Node) (*Node, error) {
+	var head, prev *Node
+	curr := node
+	for curr != nil && curr.car != nil {
+		vv, err := eval(env, curr.car)
+		if err != nil {
+			return nil, err
+		}
+		if vv == nil {
+			vv = &Node{
+				t: NodeNil,
+			}
+		}
+		newv := *vv
+		vvv := &Node{
+			t:   NodeCell,
+			car: &newv,
+		}
+		if prev != nil {
+			prev.cdr = vvv
+		} else {
+			head = vvv
+		}
+		prev = vvv
+		curr = curr.cdr
+	}
+	return head, nil
+}
+
+func call(env *Env, node *Node) (*Node, error) {
+	if node.car != nil && node.car.t == NodeIdent {
+		name := node.car.v.(string)
+		ft, ok := ops[name]
+		if ok {
+			if ft.ft == FtSpecial {
+				return ft.fn(env, node.cdr)
+			} else {
+				alist, err := eval_list(env, node.cdr)
+				if err != nil {
+					return nil, err
+				}
+				newenv := NewEnv(env)
+				if alist == nil {
+					alist = &Node{
+						t: NodeNil,
+					}
+				}
+				return ft.fn(newenv, alist)
+			}
+		}
+
+		e := env
+		var fn *Node
+		for e != nil {
+			fn, ok = e.fncs[name]
+			if ok {
+				break
+			}
+			e = e.env
+		}
+		if fn == nil {
+			return nil, fmt.Errorf("invalid op: %v", name)
+		}
+		ev := &Node{
+			t:   NodeCell,
+			car: fn,
+			cdr: node.cdr,
+		}
+		return eval(env, ev)
+	}
+
+	if node.car == nil || node.car.t != NodeEnv {
+		return nil, fmt.Errorf("illegal function call: %v", node)
+	}
+
+	scope := NewEnv(node.car.e)
+	var code *Node
+	if node.car.cdr.car != nil {
+		arg := node.car.cdr.car
+		val := node.cdr
+		for arg != nil && arg.car != nil {
+			vv, err := eval(env, val.car)
+			if err != nil {
+				return nil, err
+			}
+			scope.vars[arg.car.v.(string)] = vv
+			arg = arg.cdr
+			val = val.cdr
+		}
+		if node.car.cdr.cdr != nil && node.car.cdr.cdr.car != nil {
+			code = node.car.cdr.cdr
+		} else {
+			code = node.car.cdr
+		}
+	} else {
+		code = node.car.cdr
+	}
+
+	var ret *Node
+	var err error
+	for code != nil && code.car != nil {
+		ret, err = eval(scope, code.car)
+		if err != nil {
+			return nil, err
+		}
+		code = code.cdr
+	}
+	return ret, nil
+}
+
 func eval(env *Env, node *Node) (*Node, error) {
 	var ret *Node
 	switch node.t {
@@ -157,111 +268,7 @@ func eval(env *Env, node *Node) (*Node, error) {
 				v: nil,
 			}, nil
 		}
-		var err error
-		if node.car != nil && node.car.t == NodeIdent {
-			name := node.car.v.(string)
-			ft, ok := ops[name]
-			if !ok {
-				e := env
-				var fn *Node
-				var ok bool
-				for e != nil {
-					fn, ok = e.fncs[name]
-					if ok {
-						break
-					}
-					e = e.env
-				}
-				if fn == nil {
-					return nil, fmt.Errorf("invalid op: %v", name)
-				}
-				ev := &Node{
-					t:   NodeCell,
-					car: fn,
-					cdr: node.cdr,
-				}
-				return eval(env, ev)
-			}
-
-			if ft.ft == FtSpecial {
-				ret, err = ft.fn(env, node.cdr)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				var head, prev *Node
-				if node.cdr != nil {
-					curr := node.cdr
-					for curr != nil && curr.car != nil {
-						vv, err := eval(env, curr.car)
-						if err != nil {
-							return nil, err
-						}
-						if vv == nil {
-							vv = &Node{
-								t: NodeNil,
-							}
-						}
-						newv := *vv
-						vvv := &Node{
-							t:   NodeCell,
-							car: &newv,
-						}
-						if prev != nil {
-							prev.cdr = vvv
-						} else {
-							head = vvv
-						}
-						prev = vvv
-						curr = curr.cdr
-					}
-				}
-				newenv := NewEnv(env)
-				if head == nil {
-					head = &Node{
-						t: NodeNil,
-					}
-				}
-				ret, err = ft.fn(newenv, head)
-				if err != nil {
-					return nil, err
-				}
-			}
-		} else if node.car != nil && node.car.t == NodeEnv {
-			scope := NewEnv(node.car.e)
-			var code *Node
-			if node.car.cdr.car != nil {
-				arg := node.car.cdr.car
-				val := node.cdr
-				for arg != nil && arg.car != nil {
-					vv, err := eval(env, val.car)
-					if err != nil {
-						return nil, err
-					}
-					scope.vars[arg.car.v.(string)] = vv
-					arg = arg.cdr
-					val = val.cdr
-				}
-				if node.car.cdr.cdr != nil && node.car.cdr.cdr.car != nil {
-					code = node.car.cdr.cdr
-				} else {
-					code = node.car.cdr
-				}
-			} else {
-				code = node.car.cdr
-			}
-
-			for code != nil && code.car != nil {
-				ret, err = eval(scope, code.car)
-				if err != nil {
-					return nil, err
-				}
-				code = code.cdr
-			}
-		} else if node.car != nil && node.car.t == NodeNil {
-			ret = node.car
-		}
-		return ret, nil
+		return call(env, node)
 	case NodeQuote:
 		ret = node.car
 	default:
@@ -1049,9 +1056,7 @@ func doCond(env *Env, node *Node) (*Node, error) {
 func doCons(env *Env, node *Node) (*Node, error) {
 	var rhs *Node
 	lhs := node.car
-	if node.cdr != nil {
-		rhs = node.cdr.car
-	}
+	rhs = node.cdr.car
 	return &Node{
 		t:   NodeCell,
 		car: lhs,
@@ -1060,6 +1065,58 @@ func doCons(env *Env, node *Node) (*Node, error) {
 }
 
 func doCar(env *Env, node *Node) (*Node, error) {
+	/*
+		if node.car == nil {
+			return &Node{
+				t: NodeNil,
+			}, nil
+		}
+	*/
+	curr := node.car
+	if curr.t == NodeQuote {
+		return &Node{
+			t: NodeIdent,
+			v: "quote",
+		}, nil
+	}
+	if curr.t == NodeCell && curr.t != NodeNil {
+		return nil, fmt.Errorf("arguments should be list: %v", curr)
+	}
+
+	curr = curr.car
+	if curr == nil {
+		return &Node{
+			t: NodeNil,
+		}, nil
+	}
+	return curr, nil
+}
+
+func doCdr(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return &Node{
+			t: NodeNil,
+		}, nil
+	}
+
+	curr := node.car
+	if curr.t == NodeQuote {
+		return &Node{
+			t:   NodeCell,
+			car: curr.car,
+		}, nil
+	}
+
+	curr = curr.cdr
+	if curr == nil {
+		return &Node{
+			t: NodeNil,
+		}, nil
+	}
+	return curr, nil
+}
+
+func doFirst(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.car.car == nil {
 		return &Node{
 			t: NodeNil,
@@ -1074,37 +1131,57 @@ func doCar(env *Env, node *Node) (*Node, error) {
 	return node.car.car, nil
 }
 
-func doCdr(env *Env, node *Node) (*Node, error) {
-	if node.car == nil {
+func doSecond(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.car == nil || node.car.car.car == nil {
 		return &Node{
 			t: NodeNil,
 		}, nil
 	}
 	if node.car.t == NodeQuote {
 		return &Node{
-			t:   NodeCell,
-			car: node.car.car.cdr,
+			t: NodeIdent,
+			v: "quote",
 		}, nil
 	}
-	return node.car.cdr, nil
+	return node.car.car.car, nil
 }
 
 func doApply(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.cdr == nil || node.cdr.car == nil {
 		return nil, errors.New("invalid arguments for apply")
 	}
-	arg := node.cdr
-	if arg.car.t == NodeQuote && arg.car.car != nil {
-		arg = arg.car.car
-	} else if arg.car.t == NodeCell {
-		arg = arg.car
+
+	var head, x *Node
+	curr := node.cdr
+	for curr != nil && curr.cdr != nil && curr.cdr.t != NodeNil {
+		nn := &Node{
+			t:   NodeCell,
+			car: curr.car,
+		}
+		if head != nil {
+			x.cdr = nn
+			x = nn
+		} else {
+			head, x = nn, nn
+		}
+		curr = curr.cdr
 	}
-	v := &Node{
+
+	if curr.car != nil && curr.car.t != NodeNil && curr.car.t != NodeCell {
+		return nil, fmt.Errorf("last argument should be list: %v", node.car)
+	}
+	if head != nil {
+		x.cdr = curr.car
+	} else {
+		head = curr.car
+	}
+
+	vv := &Node{
 		t:   NodeCell,
 		car: node.car,
-		cdr: arg,
+		cdr: head,
 	}
-	return eval(env, v)
+	return call(env, vv)
 }
 
 func doAref(env *Env, node *Node) (*Node, error) {
@@ -1200,7 +1277,7 @@ func doList(env *Env, node *Node) (*Node, error) {
 			t: NodeNil,
 		}, nil
 	}
-	return node.car, nil
+	return node, nil
 }
 
 func doNull(env *Env, node *Node) (*Node, error) {
@@ -1290,8 +1367,6 @@ func doFuncall(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
 		return nil, errors.New("invalid arguments for funcall")
 	}
-	//fmt.Println(node.car)
-	//fmt.Println(node.cdr)
 	v := &Node{
 		t:   NodeCell,
 		car: node.car,
@@ -1304,8 +1379,6 @@ func doLambda(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
 		return nil, errors.New("invalid arguments for lambda")
 	}
-	//fmt.Println(node.car)
-	//fmt.Println(node.cdr)
 	v := &Node{
 		t:   NodeCell,
 		car: node.car,
