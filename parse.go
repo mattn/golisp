@@ -326,6 +326,8 @@ func (n *Node) String() string {
 		fmt.Fprintf(&buf, "'%v", n.car)
 	case NodeString:
 		fmt.Fprintf(&buf, "%q", n.v)
+	case NodeLambda:
+		fmt.Fprintf(&buf, "(lambda %v %v)", n.car, n.cdr.car)
 	case NodeEnv:
 		if n.car != nil {
 			fmt.Fprintf(&buf, "(defun %v %v %v)", n.v, n.car, n.cdr.car)

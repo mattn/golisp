@@ -1,0 +1,7 @@
+(print (null nil))
+(print (null t))
+(setq x nil)
+(print (null x))
+(print (null 'x))
+(print (apply 'null '(x)))
+(print (apply 'null (cons x nil)))
