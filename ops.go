@@ -71,6 +71,8 @@ func init() {
 	ops["progn"] = makeFn(FtBuiltin, doProgn)
 	ops["eval"] = makeFn(FtBuiltin, doEval)
 	ops["consp"] = makeFn(FtBuiltin, doConsp)
+	ops["oddp"] = makeFn(FtBuiltin, doOddp)
+	ops["evenp"] = makeFn(FtBuiltin, doEvenp)
 
 	ops["load"] = makeFn(FtBuiltin, doLoad)
 	ops["funcall"] = makeFn(FtBuiltin, doFuncall)
@@ -95,6 +97,14 @@ func NewEnv(env *Env) *Env {
 		env:  env,
 		out:  out,
 	}
+}
+
+func (n *Node) CarIsNil() bool {
+	return n.car == nil || n.car.t == NodeNil
+}
+
+func (n *Node) CdrIsNil() bool {
+	return n.cdr == nil || n.cdr.t == NodeNil
 }
 
 func (e *Env) Eval(node *Node) (*Node, error) {
@@ -1250,7 +1260,7 @@ func doFuncall(env *Env, node *Node) (*Node, error) {
 
 func doLambda(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
-		return nil, errors.New("invalid arguments for funcall")
+		return nil, errors.New("invalid arguments for lambda")
 	}
 	//fmt.Println(node.car)
 	//fmt.Println(node.cdr)
@@ -1260,4 +1270,50 @@ func doLambda(env *Env, node *Node) (*Node, error) {
 		cdr: node.cdr,
 	}
 	return eval(env, v)
+}
+
+func doOddp(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for oddp")
+	}
+
+	var b bool
+	switch node.car.t {
+	case NodeInt:
+		b = node.car.v.(int64)%2 != 0
+	case NodeDouble:
+		b = int64(node.car.v.(float64))%2 != 0
+	}
+	if b {
+		return &Node{
+			t: NodeT,
+			v: true,
+		}, nil
+	}
+	return &Node{
+		t: NodeNil,
+	}, nil
+}
+
+func doEvenp(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for evenp")
+	}
+
+	var b bool
+	switch node.car.t {
+	case NodeInt:
+		b = node.car.v.(int64)%2 == 0
+	case NodeDouble:
+		b = int64(node.car.v.(float64))%2 == 0
+	}
+	if b {
+		return &Node{
+			t: NodeT,
+			v: true,
+		}, nil
+	}
+	return &Node{
+		t: NodeNil,
+	}, nil
 }
