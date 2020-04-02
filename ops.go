@@ -203,9 +203,9 @@ func call(env *Env, node *Node) (*Node, error) {
 			t: NodeCell,
 			car: &Node{
 				t:   NodeEnv,
-				e:   env,
+				e:   node.car.e,
 				car: node.car,
-				cdr: node.car.car,
+				cdr: node.car,
 			},
 			cdr: node.cdr,
 		}
@@ -451,25 +451,37 @@ func doLet(env *Env, node *Node) (*Node, error) {
 
 func doLetStar(env *Env, node *Node) (*Node, error) {
 	if node.car == nil {
-		return nil, errors.New("invalid arguments for let*")
+		return nil, errors.New("invalid arguments for let")
+	}
+	if node.car.t == NodeNil {
+		return &Node{
+			t: NodeNil,
+		}, nil
 	}
 	scope := NewEnv(env)
 
-	var ret *Node
+	var ret, vv *Node
 	var err error
 	curr := node.car
 	for curr != nil {
-		vv, err := eval(env, curr.car.cdr.car)
-		if err != nil {
-			return nil, err
+		if curr.car.cdr == nil {
+			scope.vars[curr.car.v.(string)] = &Node{
+				t: NodeNil,
+			}
+		} else {
+			vv, err = eval(env, curr.car.cdr.car)
+			if err != nil {
+				return nil, err
+			}
+			scope.vars[curr.car.car.v.(string)] = vv
 		}
-		scope.vars[curr.car.car.v.(string)] = vv
+		env = scope
+		scope = NewEnv(env)
 		curr = curr.cdr
 	}
 
 	curr = node.cdr
 	for curr != nil {
-		scope = NewEnv(scope)
 		ret, err = eval(scope, curr.car)
 		if err != nil {
 			return nil, err
