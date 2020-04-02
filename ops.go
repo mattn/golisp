@@ -198,6 +198,17 @@ func call(env *Env, node *Node) (*Node, error) {
 			},
 			cdr: node.cdr,
 		}
+	} else if node.car != nil && node.car.t == NodeLambda {
+		node = &Node{
+			t: NodeCell,
+			car: &Node{
+				t:   NodeEnv,
+				e:   env,
+				car: node.car,
+				cdr: node.car.car,
+			},
+			cdr: node.cdr,
+		}
 	}
 
 	if node.car == nil || node.car.t != NodeEnv {
@@ -294,6 +305,19 @@ func eval(env *Env, node *Node) (*Node, error) {
 					}
 				}
 				return ft.fn(env, arg)
+			}
+		}
+		if node.car.t == NodeCell {
+			if node.car.car != nil && node.car.car.t == NodeIdent && node.car.car.v.(string) == "lambda" {
+				node = &Node{
+					t: NodeCell,
+					car: &Node{
+						t:   NodeEnv,
+						car: node.car.car,
+						cdr: node.car.cdr,
+					},
+					cdr: node.cdr,
+				}
 			}
 		}
 		return call(env, node)
