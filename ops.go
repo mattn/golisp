@@ -221,12 +221,28 @@ func call(env *Env, node *Node) (*Node, error) {
 	if node.car.cdr.car != nil {
 		arg := node.car.cdr.car
 		val := node.cdr
-		for arg != nil && arg.car != nil {
-			vv, err := eval(env, val.car)
+		for arg != nil && arg.t != NodeNil {
+			var name string
+			if arg.car != nil {
+				name = arg.car.v.(string)
+			} else {
+				name = arg.v.(string)
+			}
+			var vv *Node
+			var err error
+			if name == "&rest" {
+				arg = arg.cdr
+				name = arg.car.v.(string)
+				vv, err = evalList(env, val)
+			} else if arg.car == nil {
+				vv, err = evalList(env, val)
+			} else {
+				vv, err = eval(env, val.car)
+			}
 			if err != nil {
 				return nil, err
 			}
-			scope.vars[arg.car.v.(string)] = vv
+			scope.vars[name] = vv
 			arg = arg.cdr
 			val = val.cdr
 		}
