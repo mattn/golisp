@@ -80,6 +80,7 @@ func init() {
 	ops["load"] = makeFn(FtBuiltin, doLoad)
 	ops["funcall"] = makeFn(FtBuiltin, doFuncall)
 	ops["lambda"] = makeFn(FtSpecial, doLambda)
+	ops["type-of"] = makeFn(FtBuiltin, doTypeOf)
 }
 
 type Env struct {
@@ -1517,5 +1518,50 @@ func doEvenp(env *Env, node *Node) (*Node, error) {
 	}
 	return &Node{
 		t: NodeNil,
+	}, nil
+}
+
+func doTypeOf(env *Env, node *Node) (*Node, error) {
+	t := "unknown"
+
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for type-of")
+	}
+
+	curr := node.car
+	switch curr.t {
+	case NodeNil:
+		t = "null"
+	case NodeT:
+		t = "boolean"
+	case NodeInt:
+		t = "int"
+	case NodeDouble:
+		t = "float"
+	case NodeString:
+		t = "string"
+	case NodeQuote:
+		t = "cons"
+	case NodeBquote:
+		t = "cons"
+	case NodeCell:
+		t = "cons"
+	case NodeAref:
+		t = "aref"
+	case NodeBuiltinfunc:
+	case NodeSpecial:
+	case NodeLambda:
+		t = "function"
+	case NodeIdent:
+		t = "symbol"
+	case NodeEnv:
+		t = "environment"
+	case NodeError:
+		t = "error"
+	}
+
+	return &Node{
+		t: NodeString,
+		v: t,
 	}, nil
 }
