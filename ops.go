@@ -142,10 +142,9 @@ func evalList(env *Env, node *Node) (*Node, error) {
 				t: NodeNil,
 			}
 		}
-		newv := *vv
 		vvv := &Node{
 			t:   NodeCell,
-			car: &newv,
+			car: vv,
 		}
 		if prev != nil {
 			prev.cdr = vvv
@@ -405,14 +404,17 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 	vv := &Node{
 		t: NodeInt,
 		v: int64(0),
-		e: scope,
 	}
 	scope.vars[v] = vv
 
 	cond := node.cdr
 	var i int64
 	for i = int64(0); i < c; i++ {
-		vv.v = i
+		vv = &Node{
+			t: NodeInt,
+			v: int64(i),
+		}
+		scope.vars[v] = vv
 		if cond != nil {
 			curr := cond
 			for curr != nil {
@@ -424,7 +426,11 @@ func doDotimes(env *Env, node *Node) (*Node, error) {
 			}
 		}
 	}
-	vv.v = i
+	vv = &Node{
+		t: NodeInt,
+		v: int64(i),
+	}
+	scope.vars[v] = vv
 
 	if node.car.cdr.cdr != nil {
 		return eval(scope, node.car.cdr.cdr.car)
@@ -1738,6 +1744,7 @@ func doRplacd(env *Env, node *Node) (*Node, error) {
 	lhs := node.car
 	rhs := node.cdr.car
 	lhs.cdr = rhs
+	node.car = nil
 	return lhs, nil
 }
 
