@@ -1,5 +1,7 @@
 package golisp
 
+//go:genearte stringer -t nodetype .
+
 import (
 	"bytes"
 	"errors"
@@ -7,6 +9,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	_ "github.com/mattn/golisp/statik"
 )
 
 type Ft int
@@ -58,9 +62,9 @@ func init() {
 	ops["cons"] = makeFn(FtBuiltin, doCons)
 	ops["car"] = makeFn(FtBuiltin, doCar)
 	ops["cdr"] = makeFn(FtBuiltin, doCdr)
-	ops["first"] = makeFn(FtBuiltin, doFirst)
-	ops["second"] = makeFn(FtBuiltin, doSecond)
-	ops["third"] = makeFn(FtBuiltin, doThird)
+	//ops["first"] = makeFn(FtBuiltin, doFirst)
+	//ops["second"] = makeFn(FtBuiltin, doSecond)
+	//ops["third"] = makeFn(FtBuiltin, doThird)
 	ops["rest"] = makeFn(FtBuiltin, doCdr)
 	ops["apply"] = makeFn(FtBuiltin, doApply)
 	ops["concatenate"] = makeFn(FtBuiltin, doConcatenate)
@@ -76,13 +80,14 @@ func init() {
 	ops["consp"] = makeFn(FtBuiltin, doConsp)
 	ops["oddp"] = makeFn(FtBuiltin, doOddp)
 	ops["evenp"] = makeFn(FtBuiltin, doEvenp)
-
 	ops["load"] = makeFn(FtBuiltin, doLoad)
 	ops["funcall"] = makeFn(FtBuiltin, doFuncall)
 	ops["lambda"] = makeFn(FtSpecial, doLambda)
 	ops["type-of"] = makeFn(FtBuiltin, doTypeOf)
 	ops["labels"] = makeFn(FtSpecial, doLabels)
 	ops["flet"] = makeFn(FtSpecial, doFlet)
+	ops["rplaca"] = makeFn(FtBuiltin, doRplaca)
+	ops["rplacd"] = makeFn(FtBuiltin, doRplacd)
 }
 
 type Env struct {
@@ -297,7 +302,6 @@ func eval(env *Env, node *Node) (*Node, error) {
 			e = e.env
 		}
 		v, ok := e.fncs[name]
-		fmt.Println(name, v)
 		if ok {
 			return v, nil
 		}
@@ -345,6 +349,8 @@ func eval(env *Env, node *Node) (*Node, error) {
 		return call(env, node)
 	case NodeQuote:
 		ret = node.car
+	case NodeBquote:
+		return doBquote(env, node)
 	default:
 		ret = node
 	}
@@ -1162,13 +1168,6 @@ func doCons(env *Env, node *Node) (*Node, error) {
 }
 
 func doCar(env *Env, node *Node) (*Node, error) {
-	/*
-		if node.car == nil {
-			return &Node{
-				t: NodeNil,
-			}, nil
-		}
-	*/
 	curr := node.car
 	if curr.t == NodeQuote {
 		return &Node{
@@ -1195,7 +1194,6 @@ func doCdr(env *Env, node *Node) (*Node, error) {
 			t: NodeNil,
 		}, nil
 	}
-
 	curr := node.car
 	if curr.t == NodeQuote {
 		return &Node{
@@ -1465,7 +1463,7 @@ func doLoad(env *Env, node *Node) (*Node, error) {
 		return nil, err
 	}
 	defer f.Close()
-	curr, err := NewParser(f).ParseParen()
+	curr, err := NewParser(f).Parse()
 	if err != nil {
 		return nil, err
 	}
@@ -1653,4 +1651,98 @@ func doFlet(env *Env, node *Node) (*Node, error) {
 	}
 
 	return doProgn(scope, node)
+}
+
+func doBquote(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for bquote")
+	}
+	curr := node
+
+	var bq bool
+	if curr.t == NodeBquote {
+		curr = curr.car
+		bq = true
+	}
+
+	var l, rr *Node
+	for curr != nil {
+		expand := 0
+		var v *Node
+		var ok bool
+		var err error
+		if bq && curr.car.t == NodeIdent {
+			name := curr.car.v.(string)
+			if strings.HasPrefix(name, "@") {
+				expand = 2
+				v, ok = env.vars[name[1:]]
+				if !ok {
+					return nil, errors.New("invalid arguments for bquote")
+				}
+			} else {
+				expand = 1
+				v, ok = env.vars[name]
+				if !ok {
+					return nil, errors.New("invalid arguments for bquote")
+				}
+			}
+		} else {
+			v, err = eval(env, curr.car)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if l == nil {
+			switch expand {
+			case 0, 1:
+				l = &Node{
+					t:   NodeCell,
+					car: v,
+				}
+				rr = l
+			case 2:
+				rr, l = v.car, v.car
+			}
+		} else {
+			switch expand {
+			case 0, 1:
+				l.cdr = &Node{
+					t:   NodeCell,
+					car: v,
+				}
+				l = l.cdr
+				break
+			case 2:
+				l.cdr = v
+				for l.cdr != nil {
+					l = l.cdr
+				}
+			}
+		}
+		curr = curr.cdr
+	}
+
+	return rr, nil
+}
+
+func doRplaca(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.t != NodeCell {
+		fmt.Println(node.car)
+		return nil, errors.New("invalid arguments for rplaca")
+	}
+
+	node.car.car = node.cdr.car
+	return node.car, nil
+}
+
+func doRplacd(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.t != NodeCell {
+		fmt.Println(node.car.t)
+		return nil, errors.New("invalid arguments for rplacd")
+	}
+
+	lhs := node.car
+	rhs := node.cdr.car
+	lhs.cdr = rhs
+	return lhs, nil
 }

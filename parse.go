@@ -82,7 +82,7 @@ func (p *Parser) SkipWhite() {
 	}
 }
 
-func (p *Parser) ParseParen() (*Node, error) {
+func (p *Parser) ParseParen(bq bool) (*Node, error) {
 	head := &Node{
 		t: NodeCell,
 	}
@@ -98,22 +98,24 @@ func (p *Parser) ParseParen() (*Node, error) {
 			p.buf.ReadByte()
 		}
 
-		child, err := p.ParseAny()
+		child, err := p.ParseAny(false)
 		if err != nil {
 			return nil, err
 		}
 		if child == nil {
 			break
 		}
+		//if bq && !quote {
 		if quote {
 			child = &Node{
 				t:   NodeQuote,
 				car: child,
 			}
 		}
+		//}
 
 		if child.t == NodeIdent && child.v.(string) == "." {
-			child, err = p.ParseAny()
+			child, err = p.ParseAny(false)
 			if err != nil {
 				return nil, err
 			}
@@ -183,6 +185,27 @@ func (p *Parser) ParseString() (*Node, error) {
 	}, nil
 }
 
+func (p *Parser) ParseQuote() (*Node, error) {
+	node, err := p.ParseAny(false)
+	if err != nil {
+		return nil, err
+	}
+	return &Node{
+		t:   NodeQuote,
+		car: node,
+	}, nil
+}
+
+func (p *Parser) ParseBquote() (*Node, error) {
+	node, err := p.ParseAny(true)
+	if err != nil {
+		return nil, err
+	}
+	return &Node{
+		t:   NodeBquote,
+		car: node,
+	}, nil
+}
 func isSymbolLetter(r rune) bool {
 	return strings.ContainsRune(`+-*/<>=&%?.@_#$:*`, r)
 }
@@ -247,16 +270,13 @@ func (p *Parser) ParsePrimitive() (*Node, error) {
 			v: f,
 		}, nil
 	}
-	if s[0] == '"' {
-		return p.ParseString()
-	}
 	return &Node{
 		t: NodeIdent,
 		v: s,
 	}, nil
 }
 
-func (p *Parser) ParseAny() (*Node, error) {
+func (p *Parser) ParseAny(bq bool) (*Node, error) {
 	p.SkipWhite()
 	r, err := p.readRune()
 	if err != nil {
@@ -264,7 +284,7 @@ func (p *Parser) ParseAny() (*Node, error) {
 	}
 
 	if r == '(' {
-		node, err := p.ParseParen()
+		node, err := p.ParseParen(bq)
 		if err != nil {
 			return nil, err
 		}
@@ -279,14 +299,10 @@ func (p *Parser) ParseAny() (*Node, error) {
 		return p.ParsePrimitive()
 	}
 	if r == '\'' {
-		node, err := p.ParseAny()
-		if err != nil {
-			return nil, err
-		}
-		return &Node{
-			t:   NodeQuote,
-			car: node,
-		}, nil
+		return p.ParseQuote()
+	}
+	if r == '`' {
+		return p.ParseBquote()
 	}
 	if r == '"' {
 		return p.ParseString()
@@ -324,6 +340,8 @@ func (n *Node) String() string {
 		fmt.Fprint(&buf, "t")
 	case NodeQuote:
 		fmt.Fprintf(&buf, "'%v", n.car)
+	case NodeBquote:
+		fmt.Fprintf(&buf, "`%v", n.car)
 	case NodeString:
 		fmt.Fprintf(&buf, "%q", n.v)
 	case NodeLambda:
@@ -338,4 +356,8 @@ func (n *Node) String() string {
 		fmt.Fprint(&buf, n.v)
 	}
 	return buf.String()
+}
+
+func (p *Parser) Parse() (*Node, error) {
+	return p.ParseParen(false)
 }

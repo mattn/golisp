@@ -42,7 +42,7 @@ func TestParse(t *testing.T) {
 	for _, test := range tests {
 		t.Logf("%q", test.input)
 		parser := NewParser(strings.NewReader(test.input))
-		node, err := parser.ParseParen()
+		node, err := parser.Parse()
 		if err != nil {
 			t.Error(err)
 		}

@@ -14,6 +14,10 @@ import (
 
 func repl() {
 	env := golisp.NewEnv(nil)
+	err := golisp.LoadLib(env)
+	if err != nil {
+
+	}
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print("> ")
@@ -21,7 +25,7 @@ func repl() {
 			break
 		}
 		parser := golisp.NewParser(strings.NewReader(scanner.Text()))
-		node, err := parser.ParseParen()
+		node, err := parser.Parse()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -62,12 +66,16 @@ func main() {
 	}
 
 	parser := golisp.NewParser(f)
-	node, err := parser.ParseParen()
+	node, err := parser.Parse()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	env := golisp.NewEnv(nil)
+	err = golisp.LoadLib(env)
+	if err != nil {
+		log.Fatal(err)
+	}
 	_, err = env.Eval(node)
 	if err != nil {
 		log.Fatal(err)
