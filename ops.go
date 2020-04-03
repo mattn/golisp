@@ -1744,7 +1744,6 @@ func doRplacd(env *Env, node *Node) (*Node, error) {
 	lhs := node.car
 	rhs := node.cdr.car
 	lhs.cdr = rhs
-	node.car = nil
 	return lhs, nil
 }
 
