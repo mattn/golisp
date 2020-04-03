@@ -85,6 +85,7 @@ func init() {
 	ops["flet"] = makeFn(FtSpecial, doFlet)
 	ops["rplaca"] = makeFn(FtBuiltin, doRplaca)
 	ops["rplacd"] = makeFn(FtBuiltin, doRplacd)
+	ops["nconc"] = makeFn(FtBuiltin, doNconc)
 }
 
 type Env struct {
@@ -1722,7 +1723,6 @@ func doBquote(env *Env, node *Node) (*Node, error) {
 
 func doRplaca(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.car.t != NodeCell {
-		fmt.Println(node.car)
 		return nil, errors.New("invalid arguments for rplaca")
 	}
 
@@ -1732,7 +1732,6 @@ func doRplaca(env *Env, node *Node) (*Node, error) {
 
 func doRplacd(env *Env, node *Node) (*Node, error) {
 	if node.car == nil || node.car.t != NodeCell {
-		fmt.Println(node.car.t)
 		return nil, errors.New("invalid arguments for rplacd")
 	}
 
@@ -1740,4 +1739,40 @@ func doRplacd(env *Env, node *Node) (*Node, error) {
 	rhs := node.cdr.car
 	lhs.cdr = rhs
 	return lhs, nil
+}
+
+func doNconc(env *Env, node *Node) (*Node, error) {
+	if node.car == nil || node.car.t == NodeNil {
+		return &Node{
+			t: NodeNil,
+		}, nil
+	}
+
+	curr := node
+	for curr != nil && curr.cdr != nil {
+		if curr.car != nil && curr.car.t != NodeCell {
+			return nil, errors.New("invalid arguments for nconc")
+		}
+		curr = curr.cdr
+	}
+
+	var head, nn *Node
+	curr = node
+
+	for curr != nil && curr.t != NodeNil {
+		if curr.CarIsNil() && !curr.CdrIsNil() {
+			continue
+		}
+
+		if head != nil {
+			for nn.cdr != nil && nn.cdr.t == NodeCell {
+				nn = nn.cdr
+			}
+			nn.cdr = curr.car
+		} else {
+			head, nn = curr.car, curr.car
+		}
+		curr = curr.cdr
+	}
+	return head, nil
 }
