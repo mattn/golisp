@@ -62,9 +62,6 @@ func init() {
 	ops["cons"] = makeFn(FtBuiltin, doCons)
 	ops["car"] = makeFn(FtBuiltin, doCar)
 	ops["cdr"] = makeFn(FtBuiltin, doCdr)
-	//ops["first"] = makeFn(FtBuiltin, doFirst)
-	//ops["second"] = makeFn(FtBuiltin, doSecond)
-	//ops["third"] = makeFn(FtBuiltin, doThird)
 	ops["rest"] = makeFn(FtBuiltin, doCdr)
 	ops["apply"] = makeFn(FtBuiltin, doApply)
 	ops["concatenate"] = makeFn(FtBuiltin, doConcatenate)
@@ -1440,9 +1437,7 @@ func doEval(env *Env, node *Node) (*Node, error) {
 
 func doConsp(env *Env, node *Node) (*Node, error) {
 	switch node.car.t {
-	case NodeQuote:
-	case NodeBquote:
-	case NodeCell:
+	case NodeQuote, NodeBquote, NodeCell:
 		return &Node{
 			t: NodeT,
 			v: true,
