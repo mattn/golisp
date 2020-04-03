@@ -1742,15 +1742,9 @@ func doRplacd(env *Env, node *Node) (*Node, error) {
 }
 
 func doNconc(env *Env, node *Node) (*Node, error) {
-	if node.car == nil || node.car.t == NodeNil {
-		return &Node{
-			t: NodeNil,
-		}, nil
-	}
-
 	curr := node
 	for curr != nil && curr.cdr != nil {
-		if curr.car != nil && curr.car.t != NodeCell {
+		if curr.car != nil && curr.car.t != NodeCell && curr.car.t != NodeNil {
 			return nil, errors.New("invalid arguments for nconc")
 		}
 		curr = curr.cdr
@@ -1761,6 +1755,7 @@ func doNconc(env *Env, node *Node) (*Node, error) {
 
 	for curr != nil && curr.t != NodeNil {
 		if curr.CarIsNil() && !curr.CdrIsNil() {
+			curr = curr.cdr
 			continue
 		}
 
