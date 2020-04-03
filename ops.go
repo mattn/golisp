@@ -81,6 +81,8 @@ func init() {
 	ops["funcall"] = makeFn(FtBuiltin, doFuncall)
 	ops["lambda"] = makeFn(FtSpecial, doLambda)
 	ops["type-of"] = makeFn(FtBuiltin, doTypeOf)
+	ops["labels"] = makeFn(FtSpecial, doLabels)
+	ops["flet"] = makeFn(FtSpecial, doFlet)
 }
 
 type Env struct {
@@ -192,8 +194,10 @@ func call(env *Env, node *Node) (*Node, error) {
 			return eval(env, ev)
 		}
 		node = &Node{
+			t: NodeCell,
 			car: &Node{
 				t:   NodeEnv,
+				v:   name,
 				e:   fn.e,
 				cdr: fn,
 			},
@@ -293,6 +297,7 @@ func eval(env *Env, node *Node) (*Node, error) {
 			e = e.env
 		}
 		v, ok := e.fncs[name]
+		fmt.Println(name, v)
 		if ok {
 			return v, nil
 		}
@@ -1580,4 +1585,72 @@ func doTypeOf(env *Env, node *Node) (*Node, error) {
 		t: NodeString,
 		v: t,
 	}, nil
+}
+
+func doLabels(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for labels")
+	}
+
+	curr := node.car
+	scope := NewEnv(env)
+
+	for curr != nil && curr.car != nil && curr.car.car != nil {
+		if curr.car == nil || curr.car.car.t != NodeIdent || curr.car.cdr.t != NodeCell {
+			return nil, errors.New("invalid arguments for labels")
+		}
+		vv := &Node{
+			t:   NodeEnv,
+			e:   scope,
+			v:   curr.car.car.v.(string),
+			car: curr.car.cdr.car,
+			cdr: curr.car.cdr.cdr,
+		}
+
+		nn := &Node{
+			t:   NodeLambda,
+			e:   scope,
+			car: vv.car,
+			cdr: vv.cdr,
+		}
+
+		scope.fncs[curr.car.car.v.(string)] = nn
+		curr = curr.cdr
+	}
+
+	return doProgn(scope, node)
+}
+
+func doFlet(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for flet")
+	}
+
+	curr := node.car
+	scope := NewEnv(env)
+
+	for curr != nil && curr.car != nil && curr.car.car != nil {
+		if curr.car == nil || curr.car.car.t != NodeIdent || curr.car.cdr.t != NodeCell {
+			return nil, errors.New("invalid arguments for flet")
+		}
+		vv := &Node{
+			t:   NodeEnv,
+			e:   env,
+			v:   curr.car.car.v.(string),
+			car: curr.car.cdr.car,
+			cdr: curr.car.cdr.cdr,
+		}
+
+		nn := &Node{
+			t:   NodeLambda,
+			e:   env,
+			car: vv.car,
+			cdr: vv.cdr,
+		}
+
+		scope.fncs[curr.car.car.v.(string)] = nn
+		curr = curr.cdr
+	}
+
+	return doProgn(scope, node)
 }
