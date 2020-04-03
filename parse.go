@@ -105,14 +105,12 @@ func (p *Parser) ParseParen(bq bool) (*Node, error) {
 		if child == nil {
 			break
 		}
-		//if bq && !quote {
-		if quote {
+		if bq && !quote {
 			child = &Node{
 				t:   NodeQuote,
 				car: child,
 			}
 		}
-		//}
 
 		if child.t == NodeIdent && child.v.(string) == "." {
 			child, err = p.ParseAny(false)
