@@ -86,11 +86,13 @@ func init() {
 	ops["rplaca"] = makeFn(FtBuiltin, doRplaca)
 	ops["rplacd"] = makeFn(FtBuiltin, doRplacd)
 	ops["nconc"] = makeFn(FtBuiltin, doNconc)
+	ops["defmacro"] = makeFn(FtSpecial, doDefmacro)
 }
 
 type Env struct {
 	vars map[string]*Node
 	fncs map[string]*Node
+	mcrs map[string]*Node
 	env  *Env
 	out  io.Writer
 }
@@ -103,6 +105,7 @@ func NewEnv(env *Env) *Env {
 	return &Env{
 		vars: make(map[string]*Node),
 		fncs: make(map[string]*Node),
+		mcrs: make(map[string]*Node),
 		env:  env,
 		out:  out,
 	}
@@ -163,6 +166,8 @@ func evalList(env *Env, node *Node) (*Node, error) {
 }
 
 func call(env *Env, node *Node) (*Node, error) {
+	var macro bool
+
 	if node.car != nil && node.car.t == NodeIdent {
 		name := node.car.v.(string)
 		if ft, ok := ops[name]; ok {
@@ -185,9 +190,20 @@ func call(env *Env, node *Node) (*Node, error) {
 			e = e.env
 		}
 		if fn == nil {
-			return nil, fmt.Errorf("invalid op: %v", name)
+			global := env
+			for global.env != nil {
+				global = global.env
+			}
+			fn, ok = global.mcrs[name]
+			if ok {
+				alist = node.cdr
+				macro = true
+			}
+			if fn == nil {
+				return nil, fmt.Errorf("invalid op: %v", name)
+			}
 		}
-		if fn.t != NodeLambda {
+		if !macro && fn.t != NodeLambda {
 			ev := &Node{
 				t:   NodeCell,
 				car: fn,
@@ -195,15 +211,28 @@ func call(env *Env, node *Node) (*Node, error) {
 			}
 			return eval(env, ev)
 		}
-		node = &Node{
-			t: NodeCell,
-			car: &Node{
-				t:   NodeEnv,
-				v:   name,
-				e:   fn.e,
-				cdr: fn,
-			},
-			cdr: node.cdr,
+		if macro {
+			node = &Node{
+				t: NodeCell,
+				car: &Node{
+					t:   NodeEnv,
+					v:   name,
+					e:   fn.e,
+					cdr: fn.cdr,
+				},
+				cdr: node.cdr,
+			}
+		} else {
+			node = &Node{
+				t: NodeCell,
+				car: &Node{
+					t:   NodeEnv,
+					v:   name,
+					e:   fn.e,
+					cdr: fn,
+				},
+				cdr: node.cdr,
+			}
 		}
 	} else if node.car != nil && node.car.t == NodeLambda {
 		node = &Node{
@@ -240,6 +269,9 @@ func call(env *Env, node *Node) (*Node, error) {
 				arg = arg.cdr
 				name = arg.car.v.(string)
 				vv, err = evalList(env, val)
+			} else if macro {
+				vv, err = val.car, nil
+				fmt.Println(arg, vv)
 			} else if arg.car == nil {
 				vv, err = evalList(env, val)
 			} else {
@@ -1490,7 +1522,7 @@ func doLambda(env *Env, node *Node) (*Node, error) {
 	}
 	return &Node{
 		t:   NodeLambda,
-		e:   NewEnv(env),
+		e:   env,
 		car: node.car,
 		cdr: node.cdr,
 	}, nil
@@ -1776,4 +1808,25 @@ func doNconc(env *Env, node *Node) (*Node, error) {
 		curr = curr.cdr
 	}
 	return head, nil
+}
+
+func doDefmacro(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for defmacro")
+	}
+	nn := &Node{
+		t:   NodeLambda,
+		e:   env,
+		car: node.car,
+		cdr: node.cdr,
+	}
+
+	global := env
+	for global.env != nil {
+		global = global.env
+	}
+
+	global.mcrs[node.car.v.(string)] = nn
+
+	return nn, nil
 }
