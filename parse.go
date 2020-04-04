@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
@@ -352,11 +353,12 @@ func (n *Node) String() string {
 			fmt.Fprintf(&buf, "(defun %v %v)", n.v, n.cdr.car)
 		}
 	case NodeGoValue:
-		switch n.v.(type) {
-		case string:
-			fmt.Fprintf(&buf, "%q", n.v)
+		rv := n.v.(reflect.Value)
+		switch rv.Kind() {
+		case reflect.String:
+			fmt.Fprintf(&buf, "%q", rv.Interface())
 		default:
-			fmt.Fprint(&buf, n.v)
+			fmt.Fprint(&buf, rv.Interface())
 		}
 	default:
 		fmt.Fprint(&buf, n.v)

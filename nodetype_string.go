@@ -23,11 +23,12 @@ func _() {
 	_ = x[NodeAref-12]
 	_ = x[NodeEnv-13]
 	_ = x[NodeError-14]
+	_ = x[NodeGoValue-15]
 }
 
-const _NodeType_name = "NodeNilNodeTNodeIntNodeDoubleNodeStringNodeQuoteNodeBquoteNodeIdentNodeLambdaNodeSpecialNodeBuiltinfuncNodeCellNodeArefNodeEnvNodeError"
+const _NodeType_name = "NodeNilNodeTNodeIntNodeDoubleNodeStringNodeQuoteNodeBquoteNodeIdentNodeLambdaNodeSpecialNodeBuiltinfuncNodeCellNodeArefNodeEnvNodeErrorNodeGoValue"
 
-var _NodeType_index = [...]uint8{0, 7, 12, 19, 29, 39, 48, 58, 67, 77, 88, 103, 111, 119, 126, 135}
+var _NodeType_index = [...]uint8{0, 7, 12, 19, 29, 39, 48, 58, 67, 77, 88, 103, 111, 119, 126, 135, 146}
 
 func (i NodeType) String() string {
 	if i < 0 || i >= NodeType(len(_NodeType_index)-1) {

@@ -275,7 +275,6 @@ func call(env *Env, node *Node) (*Node, error) {
 				vv, err = evalList(env, val)
 			} else if macro {
 				vv, err = val.car, nil
-				fmt.Println(arg, vv)
 			} else if arg.car == nil {
 				vv, err = evalList(env, val)
 			} else {
@@ -1851,25 +1850,42 @@ func doMethodCall(env *Env, node *Node) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	if obj.t == NodeCell && obj.car != nil && obj.car.t == NodeGoValue {
+		obj = obj.car
+	}
 
 	var rv reflect.Value
 	var rrv []reflect.Value
 	pkg, ok := obj.v.(map[string]reflect.Value)
 	if ok {
-		rv, ok = pkg[name]
+		rv, ok := pkg[name]
 		if !ok {
 			return nil, fmt.Errorf("invalid symbol name: %v", name)
 		}
 
 		curr := node.cdr.cdr
 		args := []reflect.Value{}
-		for curr != nil {
-			args = append(args, reflect.ValueOf(curr.car.v))
+		for curr != nil && curr.car != nil {
+			arg, err := eval(env, curr.car)
+			if err != nil {
+				return nil, err
+			}
+			if arg.t == NodeCell && arg.car != nil && arg.car.t == NodeGoValue {
+				arg = arg.car
+			}
+			if arg.t == NodeGoValue {
+				args = append(args, arg.v.(reflect.Value))
+			} else {
+				args = append(args, reflect.ValueOf(arg.v))
+			}
 			curr = curr.cdr
 		}
 		rrv = rv.Call(args)
 	} else {
-		rv = obj.v.(reflect.Value)
+		rv, ok = obj.v.(reflect.Value)
+		if !ok {
+			rv = reflect.ValueOf(obj.v)
+		}
 		method := rv.MethodByName(name)
 		curr := node.cdr.cdr
 		args := []reflect.Value{}
@@ -1890,7 +1906,7 @@ func doMethodCall(env *Env, node *Node) (*Node, error) {
 			t: NodeCell,
 			car: &Node{
 				t: NodeGoValue,
-				v: ret.Interface(),
+				v: ret,
 			},
 		}
 		rets.cdr = x
