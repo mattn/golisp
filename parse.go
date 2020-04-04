@@ -29,6 +29,7 @@ const (
 	NodeAref
 	NodeEnv
 	NodeError
+	NodeGoValue
 )
 
 type Node struct {
@@ -349,6 +350,13 @@ func (n *Node) String() string {
 			fmt.Fprintf(&buf, "(defun %v %v %v)", n.v, n.car, n.cdr.car)
 		} else {
 			fmt.Fprintf(&buf, "(defun %v %v)", n.v, n.cdr.car)
+		}
+	case NodeGoValue:
+		switch n.v.(type) {
+		case string:
+			fmt.Fprintf(&buf, "%q", n.v)
+		default:
+			fmt.Fprint(&buf, n.v)
 		}
 	default:
 		fmt.Fprint(&buf, n.v)

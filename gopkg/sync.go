@@ -1,0 +1,21 @@
+package gopkg
+
+import (
+	"reflect"
+	"sync"
+)
+
+func init() {
+	Packages["sync"] = map[string]reflect.Value{
+		"NewCond": reflect.ValueOf(sync.NewCond),
+	}
+	PackageTypes["sync"] = map[string]reflect.Type{
+		"Cond":      reflect.TypeOf(sync.Cond{}),
+		"Mutex":     reflect.TypeOf(sync.Mutex{}),
+		"Once":      reflect.TypeOf(sync.Once{}),
+		"Pool":      reflect.TypeOf(sync.Pool{}),
+		"RWMutex":   reflect.TypeOf(sync.RWMutex{}),
+		"WaitGroup": reflect.TypeOf(sync.WaitGroup{}),
+	}
+	syncGo19()
+}

@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 
+	"github.com/mattn/golisp/gopkg"
 	_ "github.com/mattn/golisp/statik"
 )
 
@@ -87,6 +89,8 @@ func init() {
 	ops["rplacd"] = makeFn(FtBuiltin, doRplacd)
 	ops["nconc"] = makeFn(FtBuiltin, doNconc)
 	ops["defmacro"] = makeFn(FtSpecial, doDefmacro)
+
+	ops["go:import"] = makeFn(FtBuiltin, doGoImport)
 }
 
 type Env struct {
@@ -360,6 +364,9 @@ func eval(env *Env, node *Node) (*Node, error) {
 					}
 				}
 				return ft.fn(env, arg)
+			}
+			if node.car.v.(string)[0] == '.' && node.cdr != nil {
+				return doMethodCall(env, node)
 			}
 		}
 		if node.car.t == NodeCell {
@@ -1829,4 +1836,78 @@ func doDefmacro(env *Env, node *Node) (*Node, error) {
 	global.mcrs[node.car.v.(string)] = nn
 
 	return nn, nil
+}
+
+type F struct {
+}
+
+func (f *F) String() string {
+	return "Hello World"
+}
+
+func doMethodCall(env *Env, node *Node) (*Node, error) {
+	name := node.car.v.(string)[1:]
+	obj, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+
+	var rv reflect.Value
+	var rrv []reflect.Value
+	pkg, ok := obj.v.(map[string]reflect.Value)
+	if ok {
+		rv, ok = pkg[name]
+		if !ok {
+			return nil, fmt.Errorf("invalid symbol name: %v", name)
+		}
+
+		curr := node.cdr.cdr
+		args := []reflect.Value{}
+		for curr != nil {
+			args = append(args, reflect.ValueOf(curr.car.v))
+			curr = curr.cdr
+		}
+		rrv = rv.Call(args)
+	} else {
+		rv = obj.v.(reflect.Value)
+		method := rv.MethodByName(name)
+		curr := node.cdr.cdr
+		args := []reflect.Value{}
+		for curr != nil {
+			args = append(args, reflect.ValueOf(curr.car))
+			curr = curr.cdr
+		}
+		rrv = method.Call(args)
+	}
+
+	rets := &Node{
+		t: NodeCell,
+	}
+
+	head := rets
+	for _, ret := range rrv {
+		x := &Node{
+			t: NodeCell,
+			car: &Node{
+				t: NodeGoValue,
+				v: ret.Interface(),
+			},
+		}
+		rets.cdr = x
+		rets = x
+	}
+
+	return head.cdr, nil
+}
+
+func doGoImport(env *Env, node *Node) (*Node, error) {
+	name := fmt.Sprint(node.car.v)
+	pkg, ok := gopkg.Packages[name]
+	if !ok {
+		return nil, fmt.Errorf("invalid package name: %v", name)
+	}
+	return &Node{
+		t: NodeGoValue,
+		v: pkg,
+	}, nil
 }
