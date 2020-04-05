@@ -90,7 +90,11 @@ func init() {
 	ops["nconc"] = makeFn(FtBuiltin, doNconc)
 	ops["defmacro"] = makeFn(FtSpecial, doDefmacro)
 
-	ops["go:import"] = makeFn(FtBuiltin, doGoImport)
+	ops["go:import"] = makeFn(FtSpecial, doGoImport)
+	ops["go:make-chan"] = makeFn(FtSpecial, doGoMakeChan)
+	ops["go:chan-recv"] = makeFn(FtBuiltin, doGoChanRecv)
+	ops["go:chan-send"] = makeFn(FtBuiltin, doGoChanSend)
+	ops["go"] = makeFn(FtSpecial, doGo)
 }
 
 type Env struct {
@@ -356,16 +360,20 @@ func eval(env *Env, node *Node) (*Node, error) {
 					}
 					return ft.fn(env, alist)
 				}
-				arg := node.cdr
-				if arg == nil {
-					arg = &Node{
+				alist := node.cdr
+				if alist == nil {
+					alist = &Node{
 						t: NodeNil,
 					}
 				}
-				return ft.fn(env, arg)
+				return ft.fn(env, alist)
 			}
-			if node.car.v.(string)[0] == '.' && node.cdr != nil {
-				return doMethodCall(env, node)
+			fn := node.car.v.(string)
+			if fn[0] == '.' && node.cdr != nil {
+				if len(fn) == 1 {
+					return doGoField(env, node)
+				}
+				return doGoMethodCall(env, node)
 			}
 		}
 		if node.car.t == NodeCell {
@@ -1615,6 +1623,8 @@ func doTypeOf(env *Env, node *Node) (*Node, error) {
 		t = "symbol"
 	case NodeEnv:
 		t = "environment"
+	case NodeGoValue:
+		t = "go:" + reflect.TypeOf(curr.v).String()
 	case NodeError:
 		t = "error"
 	}
@@ -1837,14 +1847,12 @@ func doDefmacro(env *Env, node *Node) (*Node, error) {
 	return nn, nil
 }
 
-type F struct {
-}
-
-func (f *F) String() string {
-	return "Hello World"
-}
-
-func doMethodCall(env *Env, node *Node) (*Node, error) {
+func doGoMethodCall(env *Env, node *Node) (rret *Node, rerr error) {
+	defer func() {
+		if err := recover(); err != nil {
+			rerr = errors.New(fmt.Sprint(err))
+		}
+	}()
 	name := node.car.v.(string)[1:]
 	obj, err := eval(env, node.cdr.car)
 	if err != nil {
@@ -1862,9 +1870,12 @@ func doMethodCall(env *Env, node *Node) (*Node, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid symbol name: %v", name)
 		}
+		rt := rv.Type()
+		numIn := rt.NumIn()
 
 		curr := node.cdr.cdr
 		args := []reflect.Value{}
+		in := 0
 		for curr != nil && curr.car != nil {
 			arg, err := eval(env, curr.car)
 			if err != nil {
@@ -1873,12 +1884,23 @@ func doMethodCall(env *Env, node *Node) (*Node, error) {
 			if arg.t == NodeCell && arg.car != nil && arg.car.t == NodeGoValue {
 				arg = arg.car
 			}
+			var rav reflect.Value
+			at := rt.In(in)
 			if arg.t == NodeGoValue {
-				args = append(args, arg.v.(reflect.Value))
+				rav = arg.v.(reflect.Value)
+				args = append(args, rav.Convert(at))
+			} else if arg.v == nil {
+				args = append(args, reflect.Zero(at))
 			} else {
-				args = append(args, reflect.ValueOf(arg.v))
+				rav = reflect.ValueOf(arg.v)
+				args = append(args, rav.Convert(at))
 			}
 			curr = curr.cdr
+
+			in++
+			if in == numIn {
+				break
+			}
 		}
 		rrv = rv.Call(args)
 	} else {
@@ -1916,6 +1938,50 @@ func doMethodCall(env *Env, node *Node) (*Node, error) {
 	return head.cdr, nil
 }
 
+func doGoField(env *Env, node *Node) (rret *Node, rerr error) {
+	if node.car == nil || node.cdr == nil || node.cdr.cdr == nil || node.cdr.cdr.car == nil {
+		return nil, errors.New("invalid arguments for .")
+	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			rerr = errors.New(fmt.Sprint(err))
+		}
+	}()
+	obj, err := eval(env, node.cdr.car)
+	if err != nil {
+		return nil, err
+	}
+	name := fmt.Sprint(node.cdr.cdr.car.v)
+
+	if obj.t == NodeCell && obj.car != nil && obj.car.t == NodeGoValue {
+		obj = obj.car
+	}
+
+	var rv reflect.Value
+	pkg, ok := obj.v.(map[string]reflect.Value)
+	if ok {
+		rv, ok = pkg[name]
+		if !ok {
+			return nil, fmt.Errorf("invalid symbol name: %v", name)
+		}
+	} else {
+		rv, ok = obj.v.(reflect.Value)
+		if !ok {
+			rv = reflect.ValueOf(obj.v)
+		}
+		rv = rv.FieldByName(name)
+	}
+
+	return &Node{
+		t: NodeCell,
+		car: &Node{
+			t: NodeGoValue,
+			v: rv,
+		},
+	}, nil
+}
+
 func doGoImport(env *Env, node *Node) (*Node, error) {
 	name := fmt.Sprint(node.car.v)
 	pkg, ok := gopkg.Packages[name]
@@ -1925,5 +1991,120 @@ func doGoImport(env *Env, node *Node) (*Node, error) {
 	return &Node{
 		t: NodeGoValue,
 		v: pkg,
+	}, nil
+}
+
+func doGoMakeChan(env *Env, node *Node) (*Node, error) {
+	name := fmt.Sprint(node.car.v)
+	typ, ok := gopkg.BasicTypes[name]
+	if !ok {
+		return nil, fmt.Errorf("invalid type name: %v", name)
+	}
+	size := 0
+	if node.car.car != nil {
+		if node.car.car.t != NodeInt {
+			return nil, fmt.Errorf("invalid size name: %v", node.car.car.v)
+		}
+		size = int(node.car.car.v.(int64))
+	}
+	return &Node{
+		t: NodeGoValue,
+		v: reflect.MakeChan(reflect.ChanOf(reflect.BothDir, typ), size),
+	}, nil
+}
+
+func doGoChanSend(env *Env, node *Node) (rret *Node, rerr error) {
+	/*
+		defer func() {
+			if err := recover(); err != nil {
+				rerr = errors.New(fmt.Sprint(err))
+			}
+		}()
+	*/
+	if node.car == nil || node.cdr == nil || node.cdr.car == nil || node.car.t != NodeGoValue {
+		fmt.Println(node.car)
+		fmt.Println(node.car.cdr)
+		fmt.Println(node.car.cdr.car)
+		fmt.Println(node.car.t)
+		return nil, errors.New("invalid arguments for go:chan-send")
+	}
+
+	ch := node.car.v.(reflect.Value)
+
+	var rv reflect.Value
+	if node.cdr.car.t == NodeGoValue {
+		rv = node.car.car.v.(reflect.Value)
+	} else {
+		rv = reflect.ValueOf(node.cdr.car.v)
+	}
+
+	ch.Send(rv)
+
+	return node.car.car, nil
+}
+
+func doGoChanRecv(env *Env, node *Node) (rret *Node, rerr error) {
+	defer func() {
+		if err := recover(); err != nil {
+			rerr = errors.New(fmt.Sprint(err))
+		}
+	}()
+	if node.car == nil || node.car.t != NodeGoValue {
+		return nil, errors.New("invalid arguments for go:chan-recv")
+	}
+
+	ch := node.car.v.(reflect.Value)
+
+	rv, ok := ch.Recv()
+
+	var res *Node
+	if ok {
+		res = &Node{
+			t: NodeT,
+			v: true,
+		}
+	} else {
+		res = &Node{
+			t: NodeNil,
+		}
+	}
+
+	return &Node{
+		t: NodeCell,
+		car: &Node{
+			t: NodeGoValue,
+			v: rv,
+		},
+		cdr: res,
+	}, nil
+}
+
+func doGo(env *Env, node *Node) (rret *Node, rerr error) {
+	defer func() {
+		if err := recover(); err != nil {
+			rerr = errors.New(fmt.Sprint(err))
+		}
+	}()
+	if node.car == nil || node.car.t != NodeCell {
+		return nil, errors.New("invalid arguments for go")
+	}
+
+	go func(env *Env) {
+		defer func() {
+			recover()
+		}()
+		curr := node
+		for curr != nil {
+			_, err := eval(env, curr.car)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return
+			}
+			curr = curr.cdr
+		}
+	}(env)
+
+	return &Node{
+		t: NodeNil,
 	}, nil
 }

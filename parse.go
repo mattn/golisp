@@ -85,6 +85,7 @@ func (p *Parser) SkipWhite() {
 }
 
 func (p *Parser) ParseParen(bq bool) (*Node, error) {
+	first := true
 	head := &Node{
 		t: NodeCell,
 	}
@@ -114,7 +115,7 @@ func (p *Parser) ParseParen(bq bool) (*Node, error) {
 			}
 		}
 
-		if child.t == NodeIdent && child.v.(string) == "." {
+		if child.t == NodeIdent && child.v.(string) == "." && !first {
 			child, err = p.ParseAny(false)
 			if err != nil {
 				return nil, err
@@ -131,6 +132,7 @@ func (p *Parser) ParseParen(bq bool) (*Node, error) {
 			curr.cdr = x
 			curr = x
 		}
+		first = false
 		curr.car = child
 	}
 	if head.car == nil && head.cdr == nil {
