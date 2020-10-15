@@ -1983,7 +1983,7 @@ func doGoField(env *Env, node *Node) (rret *Node, rerr error) {
 }
 
 func doGoImport(env *Env, node *Node) (*Node, error) {
-	name := fmt.Sprint(node.car.v)
+	name := fmt.Sprint(node.car.car.v)
 	pkg, ok := gopkg.Packages[name]
 	if !ok {
 		return nil, fmt.Errorf("invalid package name: %v", name)
