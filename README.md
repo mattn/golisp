@@ -36,13 +36,13 @@ Print random ints.
 (let ((ch (go:make-chan string 1)))
   (go
     (.Sleep time 1e9)
-    (go:chan-send ch "3"
+    (go:chan-send ch "3")
     (.Sleep time 1e9)
-    (go:chan-send ch "2"
+    (go:chan-send ch "2")
     (.Sleep time 1e9)
-    (go:chan-send ch "1"
+    (go:chan-send ch "1")
     (.Sleep time 1e9)
-    (go:chan-send ch "Fire!"
+    (go:chan-send ch "Fire!")
   )
   (print (car (go:chan-recv ch)))
   (print (car (go:chan-recv ch)))
