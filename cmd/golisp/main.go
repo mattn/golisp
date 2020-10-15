@@ -34,7 +34,10 @@ func repl() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(ret)
+		s := ret.String()
+		if s != "" {
+			fmt.Println(s)
+		}
 	}
 }
 

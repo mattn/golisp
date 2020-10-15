@@ -313,6 +313,9 @@ func (p *Parser) ParseAny(bq bool) (*Node, error) {
 }
 
 func (n *Node) String() string {
+	if n == nil {
+		return "nil"
+	}
 	var buf bytes.Buffer
 	switch n.t {
 	case NodeCell:
@@ -355,12 +358,14 @@ func (n *Node) String() string {
 			fmt.Fprintf(&buf, "(defun %v %v)", n.v, n.cdr.car)
 		}
 	case NodeGoValue:
-		rv := n.v.(reflect.Value)
-		switch rv.Kind() {
-		case reflect.String:
-			fmt.Fprintf(&buf, "%q", rv.Interface())
-		default:
-			fmt.Fprint(&buf, rv.Interface())
+		rv, ok := n.v.(reflect.Value)
+		if ok {
+			switch rv.Kind() {
+			case reflect.String:
+				fmt.Fprintf(&buf, "%q", rv.Interface())
+			default:
+				fmt.Fprint(&buf, rv.Interface())
+			}
 		}
 	default:
 		fmt.Fprint(&buf, n.v)
