@@ -19,16 +19,22 @@ func repl() {
 
 	}
 	scanner := bufio.NewScanner(os.Stdin)
+	prev := ""
 	for {
 		fmt.Print("> ")
 		if !scanner.Scan() {
 			break
 		}
-		parser := golisp.NewParser(strings.NewReader(scanner.Text()))
+		parser := golisp.NewParser(strings.NewReader(prev + scanner.Text()))
 		node, err := parser.Parse()
 		if err != nil {
+			if err == golisp.EOF {
+				prev += scanner.Text()
+				continue
+			}
 			log.Fatal(err)
 		}
+		prev = ""
 
 		ret, err := env.Eval(node)
 		if err != nil {

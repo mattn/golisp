@@ -12,6 +12,10 @@ import (
 	"unicode"
 )
 
+var (
+	EOF = errors.New("unexpected end of file")
+)
+
 type NodeType int
 
 const (
@@ -292,7 +296,7 @@ func (p *Parser) ParseAny(bq bool) (*Node, error) {
 		}
 		r, err := p.readRune()
 		if err != nil || r != ')' {
-			return nil, errors.New("unexpected end of file")
+			return nil, EOF
 		}
 		return node, nil
 	}
