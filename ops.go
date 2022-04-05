@@ -513,7 +513,15 @@ func doLet(env *Env, node *Node) (*Node, error) {
 			}
 			switch curr.car.car.t {
 			case NodeCell:
-				curr.car.car.v = vv.v
+				obj, err := eval(env, curr.car.car.cdr.cdr.car)
+				if err != nil {
+					return nil, err
+				}
+				if obj.t == NodeCell && obj.car != nil && obj.car.t == NodeGoValue {
+					obj = obj.car
+				}
+				fld := obj.v.(reflect.Value).Elem().FieldByName(curr.car.car.cdr.car.v.(string))
+				fld.Set(vv.car.v.(reflect.Value))
 			case NodeIdent:
 				scope.vars[curr.car.car.v.(string)] = vv
 			}
