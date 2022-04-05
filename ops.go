@@ -517,7 +517,6 @@ func doLet(env *Env, node *Node) (*Node, error) {
 			case NodeIdent:
 				scope.vars[curr.car.car.v.(string)] = vv
 			}
-			break
 		}
 		curr = curr.cdr
 	}
