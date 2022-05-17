@@ -119,6 +119,10 @@ func NewEnv(env *Env) *Env {
 	}
 }
 
+func (e *Env) SetOut(o io.Writer) {
+	e.out = o
+}
+
 func (n *Node) CarIsNil() bool {
 	return n.car == nil || n.car.t == NodeNil
 }
