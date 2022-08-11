@@ -40,6 +40,7 @@ func init() {
 	ops["dotimes"] = makeFn(FtSpecial, doDotimes)
 	ops["prin1"] = makeFn(FtBuiltin, doPrin1)
 	ops["print"] = makeFn(FtBuiltin, doPrint)
+	ops["princ"] = makeFn(FtBuiltin, doPrinc)
 	ops["let"] = makeFn(FtSpecial, doLet)
 	ops["let*"] = makeFn(FtSpecial, doLetStar)
 	ops["setq"] = makeFn(FtSpecial, doSetq)
@@ -68,6 +69,8 @@ func init() {
 	ops["apply"] = makeFn(FtBuiltin, doApply)
 	ops["concatenate"] = makeFn(FtBuiltin, doConcatenate)
 	ops["defun"] = makeFn(FtSpecial, doDefun)
+	ops["float"] = makeFn(FtBuiltin, doFloat)
+	ops["while"] = makeFn(FtSpecial, doWhile)
 	ops["quote"] = makeFn(FtSpecial, doQuote)
 	ops["getenv"] = makeFn(FtBuiltin, doGetenv)
 	ops["length"] = makeFn(FtBuiltin, doLength)
@@ -411,7 +414,7 @@ func doPrin1(env *Env, node *Node) (*Node, error) {
 	if node.car.t == NodeNil {
 		fmt.Fprint(env.out, "nil")
 	} else {
-		fmt.Fprint(env.out, node.car.v)
+		fmt.Fprintln(env.out, node.car.v)
 	}
 	return node.car, nil
 }
@@ -430,6 +433,24 @@ func doPrint(env *Env, node *Node) (*Node, error) {
 		fmt.Fprintln(env.out, node.car)
 	} else {
 		fmt.Fprintln(env.out, node.car.v)
+	}
+	return node.car, nil
+}
+
+func doPrinc(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for print")
+	}
+	if node.car.t == NodeNil {
+		fmt.Fprint(env.out, "nil")
+	} else if node.car.t == NodeT {
+		fmt.Fprint(env.out, "t")
+	} else if node.car.t == NodeQuote {
+		fmt.Fprint(env.out, node.car)
+	} else if node.car.t == NodeCell {
+		fmt.Fprint(env.out, node.car)
+	} else {
+		fmt.Fprint(env.out, node.car.v)
 	}
 	return node.car, nil
 }
@@ -1387,6 +1408,53 @@ func doConcatenate(env *Env, node *Node) (*Node, error) {
 	return &Node{
 		t: NodeString,
 		v: buf.String(),
+	}, nil
+}
+
+func doFloat(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for float")
+	}
+	var ret float64
+	switch node.car.t {
+	case NodeInt:
+		ret = float64(node.car.v.(int64))
+	case NodeDouble:
+		ret = node.car.v.(float64)
+	default:
+		return nil, errors.New("invalid arguments for float")
+	}
+
+	return &Node{
+		t: NodeDouble,
+		v: ret,
+	}, nil
+}
+
+func doWhile(env *Env, node *Node) (*Node, error) {
+	if node.car == nil {
+		return nil, errors.New("invalid arguments for while")
+	}
+
+	scope := NewEnv(env)
+
+	for {
+		ret, err := eval(env, node.car)
+		if err != nil {
+			return nil, err
+		}
+		if ret.t != NodeT {
+			break
+		}
+		ret, err = doProgn(scope, node)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &Node{
+		t: NodeNil,
+		v: nil,
 	}, nil
 }
 
