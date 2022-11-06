@@ -11,7 +11,7 @@ import (
 )
 
 func TestOps(t *testing.T) {
-	fns, err := filepath.Glob("testdir/*.lisp")
+	fns, err := filepath.Glob("testdata/*.lisp")
 	if err != nil {
 		t.Fatal(err)
 	}
